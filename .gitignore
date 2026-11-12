@@ -6,3 +6,7 @@ target/
 .env
 *.key
 secrets/
+.claude/
+build/*.wat
+build/state.json
+build/tenancy_vault.wasm

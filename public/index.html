@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TenancyVault</title>
+<meta name="description" content="A rental caution deposit in a NEAR account with no keys, running code pinned by hash. Refunded by default unless the landlord files an evidenced claim in time.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f6f5c'/%3E%3Cpath d='M8 15l8-6 8 6v9H8z' fill='none' stroke='white' stroke-width='2.2' stroke-linejoin='round'/%3E%3Crect x='13.5' y='17' width='5' height='7' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <h1>TenancyVault</h1>
+    <p class="lede">A rental caution deposit held by a NEAR account that has no keys and runs code pinned by hash. Nobody can move it by hand. The tenant gets it back by default, unless the landlord files a claim in time.</p>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button role="tab" id="tab-sim" aria-selected="true" aria-controls="panel-sim">Walk-through</button>
+      <button role="tab" id="tab-ver" aria-selected="false" aria-controls="panel-ver">Verify on testnet</button>
+      <button role="tab" id="tab-how" aria-selected="false" aria-controls="panel-how">How it works</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+<section id="panel-sim" role="tabpanel" aria-labelledby="tab-sim">
+  <p class="banner"><strong>Simulation.</strong> This panel runs the same rules as the contract in your browser so you can try every role. It is not on chain and the money is fake. The real contract is checked in the next tab.</p>
+
+  <div class="grid">
+    <div class="card" aria-live="polite">
+      <h2>Vault</h2>
+      <p class="phase" id="phase"></p>
+      <dl class="kv">
+        <dt>Held</dt><dd id="held" class="num"></dd>
+        <dt>Cap</dt><dd id="cap" class="num"></dd>
+        <dt>Day</dt><dd id="day" class="num"></dd>
+        <dt>Claim window</dt><dd id="win" class="num"></dd>
+      </dl>
+      <h3>Paid out so far</h3>
+      <dl class="kv">
+        <dt>Landlord</dt><dd id="p-landlord" class="num"></dd>
+        <dt>Tenant</dt><dd id="p-tenant" class="num"></dd>
+        <dt>Arbiter</dt><dd id="p-arbiter" class="num"></dd>
+      </dl>
+      <div class="row">
+        <button type="button" data-adv="1">+1 day</button>
+        <button type="button" data-adv="5">+5 days</button>
+        <button type="button" data-adv="7">+7 days</button>
+        <button type="button" id="reset" class="quiet">Start over</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Act as</h2>
+      <div class="seg" role="radiogroup" aria-label="Role" id="roles">
+        <button type="button" role="radio" aria-checked="true" data-role="anyone">Anyone</button>
+        <button type="button" role="radio" aria-checked="false" data-role="tenant">Tenant</button>
+        <button type="button" role="radio" aria-checked="false" data-role="landlord">Landlord</button>
+        <button type="button" role="radio" aria-checked="false" data-role="arbiter1">Arbiter 1</button>
+        <button type="button" role="radio" aria-checked="false" data-role="arbiter2">Arbiter 2</button>
+      </div>
+      <div id="actions"></div>
+      <p id="err" class="err" role="status"></p>
+    </div>
+
+    <div class="card wide">
+      <h2>Log</h2>
+      <ol id="log" class="log"><li class="muted">Nothing yet. Start by paying the deposit as anyone, then act as the tenant.</li></ol>
+    </div>
+  </div>
+</section>
+
+<section id="panel-ver" role="tabpanel" aria-labelledby="tab-ver" hidden>
+  <p class="banner"><strong>Live check.</strong> These checks run in your browser against the public testnet RPC. Nothing here is simulated.</p>
+  <form id="verify-form" class="card" autocomplete="off">
+    <label for="vault-id">Vault account</label>
+    <div class="row">
+      <input id="vault-id" name="vault" type="text" spellcheck="false" autocapitalize="none" placeholder="0s... account id" required pattern="[a-z0-9_.\-]{2,64}">
+      <button type="submit" id="verify-btn">Check</button>
+    </div>
+    <p class="muted" id="ver-hint"></p>
+  </form>
+  <div class="card">
+    <h2>Checks</h2>
+    <ul id="checks" class="checks"><li class="muted">No vault checked yet. Paste a vault account and press Check.</li></ul>
+  </div>
+  <div class="card">
+    <h2>Vault terms and progress</h2>
+    <pre id="state" class="state">Run a check to read the vault state.</pre>
+  </div>
+</section>
+
+<section id="panel-how" role="tabpanel" aria-labelledby="tab-how" hidden>
+  <div class="card prose">
+    <h2>In 30 seconds</h2>
+    <p>Today a landlord holds the caution deposit and the tenant hopes to get it back. Here the deposit sits in a NEAR account with <strong>no access keys</strong>. Its code is referenced <strong>by hash</strong> from a global contract, so no publisher can swap it. Neither side can take the money out by hand: only the contract rules move it.</p>
+    <ol>
+      <li>Both sides sign the lease terms and a move-in condition report. Only a salted hash of them goes into the vault. No names, addresses or photos are on chain.</li>
+      <li>The deposit is paid in, up to a cap.</li>
+      <li>The tenant declares handover. The landlord then has a fixed window to file one claim.</li>
+      <li>No claim: anyone can trigger the refund to the tenant. Claim: only the claimed amount stays locked and the rest goes back to the tenant at once.</li>
+      <li>An arbiter named in the lease splits the locked amount. A second arbiter can step in if the first stays silent. Payouts always sum to exactly the amount held.</li>
+    </ol>
+    <h2>What this does not do</h2>
+    <ul>
+      <li>It does not replace a court. It is a private contract between the parties. We have not checked how Nigerian courts would treat it.</li>
+      <li>Disputes still need a human arbiter, and an arbiter can be wrong.</li>
+      <li>Landlords must choose to use it. We have not verified that any would.</li>
+      <li>There is no naira rail. Intended for dollar-quoted rentals. This build holds testnet NEAR.</li>
+      <li>Paying in from other chains through NEAR Intents is not built: Intents has no testnet.</li>
+    </ul>
+  </div>
+</section>
+</main>
+
+<footer class="wrap foot">Built for NEAR HACKATHON, testnet only. Code is open under the MIT licence.</footer>
+<script type="module" src="app.js"></script>
+</body>
+</html>
