@@ -1,0 +1,8 @@
+.tools/
+.wrangler-home/
+.wrangler/
+node_modules/
+target/
+.env
+*.key
+secrets/
