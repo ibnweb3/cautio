@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test tests/sim.test.mjs"
+    "test": "node --test tests/state.test.mjs",
+    "build:web": "esbuild web/near.js --bundle --format=esm --platform=browser --minify --define:global=globalThis --alias:util=./web/util-stub.js --outfile=public/near.bundle.js"
   },
   "keywords": [],
   "author": "",
@@ -13,5 +14,8 @@
   "dependencies": {
     "near-api-js": "^7.5.3"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
 }

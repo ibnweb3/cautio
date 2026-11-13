@@ -7,9 +7,9 @@ body{margin:0;background:#9fb7b4;color:var(--ink);font:16px/1.55 var(--sans);-we
 h1{font-family:var(--serif);font-weight:400;font-size:clamp(2.2rem,6vw,3.4rem);line-height:1.08;margin:0 0 14px;letter-spacing:-.015em}
 .card,.banner{background:var(--card);border:1px solid rgba(255,255,255,.5);border-radius:18px;padding:20px;margin-bottom:16px;box-shadow:0 8px 30px rgba(20,40,35,.12);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .banner{padding:12px 16px;margin:0 0 16px;max-width:80ch;border-radius:14px}
-.brand{position:fixed;top:16px;left:16px;z-index:5;background:var(--card);border-radius:14px;padding:10px 18px;color:var(--ink);text-decoration:none;font-weight:600;letter-spacing:.12em;font-size:.95rem;display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(20,40,35,.12)}
+.brand{position:absolute;top:16px;left:16px;z-index:5;background:var(--card);border-radius:14px;padding:10px 18px;color:var(--ink);text-decoration:none;font-weight:600;letter-spacing:.12em;font-size:.95rem;display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(20,40,35,.12)}
 .brand small{font-size:.6rem;font-weight:500;letter-spacing:.14em;color:var(--muted);margin-top:2px}
-.net{position:fixed;top:24px;right:16px;z-index:5;background:var(--card);border-radius:10px;padding:8px 12px;font-size:.7rem;letter-spacing:.14em;font-weight:500;color:var(--muted)}
+.net{position:absolute;top:24px;right:16px;z-index:5;background:var(--card);border-radius:10px;padding:8px 12px;font-size:.7rem;letter-spacing:.14em;font-weight:500;color:var(--muted)}
 header.hero{padding-top:88px}
 .hero-card{max-width:560px;padding:28px}
 .eyebrow{margin:0 0 10px;font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
@@ -70,4 +70,39 @@ input,select{font:inherit;font-size:16px;width:100%;padding:9px 10px;border:1px 
 .checks li.muted{display:block}
 
 @media (hover:hover){.tabs button:not([aria-selected=true]):hover{background:rgba(47,90,73,.1)}}
-@media (max-width:560px){header.hero{padding-top:80px}.tabs button{padding:10px 11px;font-size:.9rem}.hero-card{padding:20px}.net{display:none}}
+@media (max-width:560px){header.hero{padding-top:80px}.tabs button{padding:10px 9px;font-size:.86rem}.hero-card{padding:20px}.net{display:none}}
+
+/* ---- app ---- */
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.head h2{margin:0}
+.row.nowrap{flex-wrap:nowrap;margin-top:6px}
+.row.nowrap input{flex:1;font-family:var(--mono);font-size:16px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{padding:5px 11px;border-radius:99px;font-size:.82rem;font-family:var(--mono);background:rgba(47,90,73,.08);border-color:transparent}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px 16px;margin:14px 0}
+.f{min-width:0}
+.f.wide{margin-bottom:6px}
+.f label{font-size:.85rem;color:var(--muted);margin-bottom:4px;font-weight:500}
+.pair{display:flex;gap:8px}
+.pair input{flex:1;min-width:0}
+.pair select{width:auto}
+.mini{padding:2px 6px;border:0;background:none;color:var(--accent);font-size:.8rem;text-decoration:underline;margin-top:2px}
+textarea{font:inherit;font-size:16px;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);resize:vertical}
+input[type=file]{padding:6px;background:#fff}
+input:focus-visible,textarea:focus-visible,select:focus-visible{outline:none;box-shadow:0 0 0 3px var(--focus)}
+.addr{font-family:var(--mono);font-size:.85rem;overflow-wrap:anywhere;text-align:right}
+.msg{min-height:1.4em;margin:12px 0 0;color:var(--ok)}
+.msg.bad{color:var(--bad)}
+.actform{display:grid;gap:10px}
+.actform .f{margin:0}
+.actform button[type=submit]{justify-self:start}
+.hint{margin:0 0 8px;font-size:.92rem}
+.stack{display:grid;gap:8px;margin-top:10px;max-width:520px}
+.banner-note{background:rgba(47,90,73,.08);border-radius:10px;padding:10px 14px;margin:0 0 14px}
+details{margin-top:12px}
+summary{cursor:pointer;color:var(--muted)}
+.kv dd.addr{text-align:right}
+#open-done{margin-top:16px;border-top:1px solid var(--line);padding-top:8px}
+#open-done .addr{text-align:left}
+#open-done .row{gap:14px}
+#vault-empty{margin-top:0}

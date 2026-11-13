@@ -12,7 +12,7 @@
 <body>
 <div class="scene" role="img" aria-label="Aerial view of Ikoyi, Lagos, with houses, trees and the lagoon"></div>
 <a class="brand" href="#" aria-label="Cautio"><span class="mark">&#9672;</span> CAUTIO<small>A KEYLESS DEPOSIT VAULT</small></a>
-<span class="net">TESTNET</span>
+<span class="net">NEAR TESTNET</span>
 <header class="hero wrap">
   <div class="card hero-card">
     <p class="eyebrow">Rental caution deposits</p>
@@ -21,85 +21,122 @@
   </div>
 </header>
 <nav class="tabs" role="tablist" aria-label="Sections">
-  <button role="tab" id="tab-sim" aria-selected="true" aria-controls="panel-sim">Walk-through</button>
-  <button role="tab" id="tab-ver" aria-selected="false" aria-controls="panel-ver">Verify live</button>
+  <button role="tab" id="tab-vault" aria-selected="true" aria-controls="panel-vault">Vaults</button>
+  <button role="tab" id="tab-open" aria-selected="false" aria-controls="panel-open">New vault</button>
+  <button role="tab" id="tab-account" aria-selected="false" aria-controls="panel-account">Account</button>
   <button role="tab" id="tab-how" aria-selected="false" aria-controls="panel-how">How it works</button>
 </nav>
 
 <main class="wrap">
-<section id="panel-sim" role="tabpanel" aria-labelledby="tab-sim">
-  <p class="banner"><strong>Simulation.</strong> This panel runs the same rules as the contract in your browser so you can try every role. It is not on chain and the money is fake. The real contract is checked in the next tab.</p>
 
-  <div class="grid">
+<!-- ============ VAULTS ============ -->
+<section id="panel-vault" role="tabpanel" aria-labelledby="tab-vault">
+  <form id="lookup" class="card" autocomplete="off">
+    <label for="vault-id">Vault address</label>
+    <div class="row nowrap">
+      <input id="vault-id" name="vault" type="text" spellcheck="false" autocapitalize="none" placeholder="0s..." required pattern="[a-z0-9_.\-]{2,64}">
+      <button type="submit" class="primary" id="lookup-btn">Open</button>
+    </div>
+    <div id="recent" class="chips" aria-label="Recent vaults"></div>
+  </form>
+
+  <div id="vault-view" hidden>
     <div class="card" aria-live="polite">
-      <h2>Vault</h2>
-      <p class="phase" id="phase"></p>
-      <dl class="kv">
-        <dt>Held</dt><dd id="held" class="num"></dd>
-        <dt>Cap</dt><dd id="cap" class="num"></dd>
-        <dt>Day</dt><dd id="day" class="num"></dd>
-        <dt>Claim window</dt><dd id="win" class="num"></dd>
-      </dl>
-      <h3>Paid out so far</h3>
-      <dl class="kv">
-        <dt>Landlord</dt><dd id="p-landlord" class="num"></dd>
-        <dt>Tenant</dt><dd id="p-tenant" class="num"></dd>
-        <dt>Arbiter</dt><dd id="p-arbiter" class="num"></dd>
-      </dl>
-      <div class="row">
-        <button type="button" data-adv="1">+1 day</button>
-        <button type="button" data-adv="5">+5 days</button>
-        <button type="button" data-adv="7">+7 days</button>
-        <button type="button" id="reset" class="quiet">Start over</button>
+      <div class="head">
+        <h2>Vault status</h2>
+        <button type="button" id="refresh" class="quiet">Refresh</button>
       </div>
+      <p id="phase" class="phase"></p>
+      <p id="next" class="muted"></p>
+      <dl class="kv" id="figures"></dl>
+      <h3>Parties</h3>
+      <dl class="kv" id="parties"></dl>
+      <p class="row"><button type="button" id="copy-link" class="quiet">Copy link to this vault</button><span id="copy-note" class="muted" role="status"></span></p>
     </div>
 
     <div class="card">
-      <h2>Act as</h2>
-      <div class="seg" role="radiogroup" aria-label="Role" id="roles">
-        <button type="button" role="radio" aria-checked="true" data-role="anyone">Anyone</button>
-        <button type="button" role="radio" aria-checked="false" data-role="tenant">Tenant</button>
-        <button type="button" role="radio" aria-checked="false" data-role="landlord">Landlord</button>
-        <button type="button" role="radio" aria-checked="false" data-role="arbiter1">Arbiter 1</button>
-        <button type="button" role="radio" aria-checked="false" data-role="arbiter2">Arbiter 2</button>
-      </div>
+      <h2>Your actions</h2>
+      <p id="you" class="muted"></p>
       <div id="actions"></div>
-      <p id="err" class="err" role="status"></p>
+      <p id="act-msg" class="msg" role="status"></p>
     </div>
 
-    <div class="card wide">
-      <h2>Log</h2>
-      <ol id="log" class="log"><li class="muted">Nothing yet. Start by paying the deposit as anyone, then act as the tenant.</li></ol>
+    <div class="card">
+      <h2>Checks against the chain</h2>
+      <ul id="checks" class="checks"></ul>
+      <details><summary>Raw vault state</summary><pre id="state" class="state"></pre></details>
     </div>
   </div>
+  <p id="vault-empty" class="card muted">Enter a vault address, or open one you created. Nothing is stored on our server: this page reads the NEAR testnet directly.</p>
 </section>
 
-<section id="panel-ver" role="tabpanel" aria-labelledby="tab-ver" hidden>
-  <p class="banner"><strong>Live check.</strong> These checks run in your browser against the public testnet RPC. Nothing here is simulated.</p>
-  <form id="verify-form" class="card" autocomplete="off">
-    <label for="vault-id">Vault account</label>
-    <div class="row">
-      <input id="vault-id" name="vault" type="text" spellcheck="false" autocapitalize="none" placeholder="0s... account id" required pattern="[a-z0-9_.\-]{2,64}">
-      <button type="submit" id="verify-btn">Check</button>
+<!-- ============ OPEN A VAULT ============ -->
+<section id="panel-open" role="tabpanel" aria-labelledby="tab-open" hidden>
+  <form id="open-form" class="card" autocomplete="off" novalidate>
+    <h2>Open a vault</h2>
+    <p class="muted">Creates a real keyless vault on NEAR testnet. You sign with the account in <strong>Account</strong> tab; it only pays the fee and holds no power over the vault afterwards.</p>
+    <div class="fields">
+      <div class="f"><label for="o-landlord">Landlord account</label><input id="o-landlord" name="landlord" required spellcheck="false" autocapitalize="none" placeholder="landlord.testnet"><button type="button" class="mini" data-me="o-landlord">Use my account</button></div>
+      <div class="f"><label for="o-tenant">Tenant refund account</label><input id="o-tenant" name="tenant" required spellcheck="false" autocapitalize="none" placeholder="tenant.testnet"><button type="button" class="mini" data-me="o-tenant">Use my account</button></div>
+      <div class="f"><label for="o-recovery">Tenant recovery account</label><input id="o-recovery" name="recovery" required spellcheck="false" autocapitalize="none" placeholder="used if the tenant loses their key"><button type="button" class="mini" data-me="o-recovery">Use my account</button></div>
+      <div class="f"><label for="o-arb1">Arbiter 1</label><input id="o-arb1" name="arbiter1" required spellcheck="false" autocapitalize="none" placeholder="arbiter.testnet"><button type="button" class="mini" data-me="o-arb1">Use my account</button></div>
+      <div class="f"><label for="o-arb2">Arbiter 2 (backup)</label><input id="o-arb2" name="arbiter2" required spellcheck="false" autocapitalize="none" placeholder="steps in if arbiter 1 is silent"><button type="button" class="mini" data-me="o-arb2">Use my account</button></div>
+      <div class="f"><label for="o-cap">Deposit cap (NEAR)</label><input id="o-cap" name="cap" required inputmode="decimal" value="5"></div>
+      <div class="f"><label for="o-window">Landlord claim window</label><div class="pair"><input id="o-window" name="window" required inputmode="numeric" value="7"><select name="windowUnit" aria-label="Claim window unit"><option value="d">days</option><option value="m">minutes</option></select></div></div>
+      <div class="f"><label for="o-sla">Arbiter 1 time before arbiter 2 may act</label><div class="pair"><input id="o-sla" name="sla" required inputmode="numeric" value="5"><select name="slaUnit" aria-label="Arbiter wait unit"><option value="d">days</option><option value="m">minutes</option></select></div></div>
+      <div class="f"><label for="o-timelock">Recovery waiting time</label><div class="pair"><input id="o-timelock" name="timelock" required inputmode="numeric" value="30"><select name="timelockUnit" aria-label="Recovery wait unit"><option value="d">days</option><option value="m">minutes</option></select></div></div>
+      <div class="f"><label for="o-fee">Arbiter fee cap (% of the locked amount)</label><input id="o-fee" name="fee" required inputmode="decimal" value="5"></div>
     </div>
-    <p class="muted" id="ver-hint"></p>
+    <div class="f wide"><label for="o-terms">Lease terms and move-in report</label><textarea id="o-terms" name="terms" rows="5" required placeholder="Paste the agreed lease terms and move-in condition notes. They are hashed in your browser. Only the hash goes on chain."></textarea></div>
+    <p class="muted" id="open-cost"></p>
+    <div class="row"><button type="submit" class="primary" id="open-btn">Create vault</button></div>
+    <p id="open-msg" class="msg" role="status"></p>
+    <div id="open-done" hidden></div>
   </form>
+</section>
+
+<!-- ============ MY ACCOUNT ============ -->
+<section id="panel-account" role="tabpanel" aria-labelledby="tab-account" hidden>
   <div class="card">
-    <h2>Checks</h2>
-    <ul id="checks" class="checks"><li class="muted">No vault checked yet. Paste a vault account and press Check.</li></ul>
-  </div>
-  <div class="card">
-    <h2>Vault terms and progress</h2>
-    <pre id="state" class="state">Run a check to read the vault state.</pre>
+    <h2>My testnet account</h2>
+    <p class="banner-note"><strong>Testnet only.</strong> Your key is created and kept in this browser (local storage). Anyone with access to this browser profile can use it. Never put a mainnet key here. Clearing site data deletes it, so export a copy.</p>
+    <div id="acct-none" hidden>
+      <div class="row"><button type="button" class="primary" id="acct-new">Create an account</button></div>
+      <details><summary>I already have a testnet key</summary>
+        <form id="import-form" autocomplete="off" class="stack">
+          <label for="import-key">Private key (ed25519:...)</label>
+          <input id="import-key" type="password" autocomplete="off" spellcheck="false" required>
+          <label for="import-id">Account id</label>
+          <input id="import-id" type="text" spellcheck="false" autocapitalize="none" placeholder="name.testnet, or the 64-character address" required>
+          <div class="row"><button type="submit">Use this key</button></div>
+        </form>
+      </details>
+    </div>
+    <div id="acct-have" hidden>
+      <dl class="kv">
+        <dt>Address</dt><dd class="addr" id="acct-id"></dd>
+        <dt>Balance</dt><dd class="num" id="acct-bal"></dd>
+      </dl>
+      <div class="row">
+        <button type="button" id="acct-copy">Copy address</button>
+        <button type="button" id="acct-refresh" class="quiet">Refresh balance</button>
+        <button type="button" id="acct-export" class="quiet">Show private key</button>
+        <button type="button" id="acct-remove" class="quiet">Remove from this browser</button>
+      </div>
+      <pre id="acct-secret" class="state" hidden></pre>
+      <p class="muted" id="acct-hint"></p>
+    </div>
+    <p id="acct-msg" class="msg" role="status"></p>
   </div>
 </section>
 
+<!-- ============ HOW IT WORKS ============ -->
 <section id="panel-how" role="tabpanel" aria-labelledby="tab-how" hidden>
   <div class="card prose">
     <h2>In 30 seconds</h2>
     <p>Today a landlord holds the caution deposit and the tenant hopes to get it back. Here the deposit sits in a NEAR account with <strong>no access keys</strong>. Its code is referenced <strong>by hash</strong> from a global contract, so no publisher can swap it. Neither side can take the money out by hand: only the contract rules move it.</p>
     <ol>
-      <li>Both sides sign the lease terms and a move-in condition report. Only a salted hash of them goes into the vault. No names, addresses or photos are on chain.</li>
+      <li>Both sides agree the lease terms and a move-in condition report. Only a salted hash of them goes into the vault. No names, addresses or photos are on chain.</li>
       <li>The deposit is paid in, up to a cap.</li>
       <li>The tenant declares handover. The landlord then has a fixed window to file one claim.</li>
       <li>No claim: anyone can trigger the refund to the tenant. Claim: only the claimed amount stays locked and the rest goes back to the tenant at once.</li>
@@ -108,23 +145,25 @@
     <h2>Why NEAR, honestly</h2>
     <p>Refund-by-default escrow can be written on other chains, and other projects have. What NEAR adds here:</p>
     <ul>
-      <li><strong>Keyless is a checkable property.</strong> The vault is a deterministic account created from a code hash and its terms. Anyone can confirm with one RPC call that it has zero keys and which code it runs.</li>
+      <li><strong>Keyless is a checkable property.</strong> The vault is a deterministic account created from a code hash and its terms. Anyone can confirm with one RPC call that it has zero keys and which code it runs. The Vaults tab does exactly that.</li>
       <li><strong>One published copy of the code.</strong> Each vault only references the global contract by hash, so creating a vault is cheap after the one-time publish.</li>
       <li><strong>Named nested accounts</strong> fit buildings and units: <code>unit-4b.building.testnet</code>.</li>
     </ul>
     <h2>What this does not do</h2>
     <ul>
+      <li>It runs on NEAR testnet only. The money is test tokens. Mainnet use needs a real wallet flow, an audit and legal review that have not been done.</li>
       <li>It does not replace a court. It is a private contract between the parties. We have not checked how Nigerian courts would treat it.</li>
       <li>Disputes still need a human arbiter, and an arbiter can be wrong.</li>
       <li>Landlords must choose to use it. We have not verified that any would.</li>
-      <li>There is no naira rail. Intended for dollar-quoted rentals. This build holds testnet NEAR.</li>
+      <li>There is no naira rail. Intended for dollar-quoted rentals.</li>
       <li>Paying in from other chains through NEAR Intents is not built: Intents has no testnet.</li>
+      <li>The key in <em>Account</em> tab sits in your browser's local storage. That is fine for testnet and not for real money.</li>
     </ul>
   </div>
 </section>
 </main>
 
-<footer class="wrap foot">Built for NEAR HACKATHON, testnet only. MIT licence. Photo: Ikoyi, Lagos, by Reginald Bassey, <a href="https://commons.wikimedia.org/wiki/File:Ikoyi,_Lagos,_Nigeria.jpg">CC BY-SA 4.0</a>.</footer>
+<footer class="wrap foot">Built for NEAR HACKATHON, testnet only. MIT licence. <a href="https://github.com/ibnweb3/cautio">Source</a>. Photo: Ikoyi, Lagos, by Reginald Bassey, <a href="https://commons.wikimedia.org/wiki/File:Ikoyi,_Lagos,_Nigeria.jpg">CC BY-SA 4.0</a>.</footer>
 <script type="module" src="app.js"></script>
 </body>
 </html>

@@ -24,20 +24,25 @@ Today the landlord holds the caution deposit. Getting it back after move-out is 
 
 ## Try it (what to do, what you should see)
 
+The site is a working testnet app. Nothing on it is simulated: it talks to NEAR testnet from your browser.
+
 | Do | See |
 |---|---|
-| `npm test` | 8 simulator tests pass |
+| Site, tab **Vaults**: open the example vault | live status read from chain, and checks: no access keys, code referenced by hash, code re-hashed in your browser |
+| Tab **Account**: create an account | a testnet key made in your browser (kept in local storage) and its address. Send it a little testnet NEAR |
+| Tab **New vault**: fill in the parties, cap, windows and lease terms, press Create | a real keyless vault on testnet, its address, and the terms file to keep |
+| Back in **Vaults**: pay the deposit, declare handover, file a claim, rule | each action is a signed testnet transaction with a link to the explorer. Buttons show only what your account may do in the vault's current phase |
+| `npm test` | 5 tests: the browser state encoder matches the Node one byte for byte, the published code hash, vault address derivation, amount parsing |
 | `cd contract && cargo test` (needs Rust) | 20 contract tests pass |
-| Open the site (or `python -m http.server -d public` and open the page), tab **Walk-through**: pay deposit as Anyone, declare handover as Tenant, file a 300 claim as Landlord, rule as Arbiter 1 | log shows every step; payouts add up to the amount held |
-| Tab **Verify live** and press Check | live RPC checks: no access keys, code referenced by hash and re-hashed in your browser, `get_state`, and the lease NFT |
-| Read [`evidence/EVIDENCE.md`](evidence/EVIDENCE.md) | transaction links for the live runs |
+| Read [`evidence/EVIDENCE.md`](evidence/EVIDENCE.md) and [`evidence/browser-run.md`](evidence/browser-run.md) | transaction links and what each run proved |
 
-The Walk-through tab is a **simulation** of the same rules in your browser (fake money). The Verify tab is **live testnet**.
+One account in the browser can hold one role at a time. To try all roles, open the vault with different accounts (import a key in the Account tab), or share the vault link with the other parties.
 
 ## What is live on testnet
 
 - Contract published as an immutable global contract. Code hash `2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM` (sha256 of [`build/opt.wasm`](build/opt.wasm)).
 - Three vaults created with `DeterministicStateInit` (keyless accounts whose address is derived from the code hash and the terms). Vault C, `0sbe62faf670eea0865bcc7cdb7536c1b670dc81d4`, ran the full claim and arbiter path. Vaults A and B ran the default-refund path.
+- Vault D, `0sc28f1987ea5e2ccfeace344ed95076ad2d46bdbd`, was created **from the web page** (the in-browser account was the landlord), then funded and given a claim from the page. See `evidence/browser-run.md`.
 - Building root account `derby-tv-bldg.testnet`, unit sub-account `unit-4b.derby-tv-bldg.testnet`, and a lease NFT (`lease-4b-1`) owned by the tenant. Its metadata names the vault and terms hash.
 
 See [`evidence/EVIDENCE.md`](evidence/EVIDENCE.md) for what was checked and what was not.
@@ -88,12 +93,12 @@ We did not build NEAR Intents pay-in (see below), so that part of the idea is no
 
 ## Not built
 
-NEAR Intents pay-in from other chains (Intents has no testnet and we did not spend mainnet funds), naira or cNGN rails, passkey accounts, a bonded arbiter panel, unpaid-rent claims (dropped on purpose: a capped deposit cannot cover arrears, and a landlord-triggered rent claim could reward an illegal lockout), encrypted condition-report storage, lease renewal.
+A real wallet connection (the page signs with a testnet key it creates in your browser, which is not safe for real money), minting the lease NFT from the page (done by script for the example only), the recovery actions in the page (unit tests only), arbiter 2's ruling button (in the page but not run live), NEAR Intents pay-in from other chains (Intents has no testnet and we did not spend mainnet funds), naira or cNGN rails, passkey accounts, a bonded arbiter panel, unpaid-rent claims (dropped on purpose: a capped deposit cannot cover arrears, and a landlord-triggered rent claim could reward an illegal lockout), encrypted condition-report storage, lease renewal.
 
 ## Files
 
 - `contract/`: the Rust contract and its 20 unit tests.
-- `public/`: the web app (static). `sim.js` mirrors the contract rules; `app.js` runs the live checks.
+- `public/`: the web app (static). `app.js` is the app, `state.js` builds the vault's initial state and hashes in the browser, `near.bundle.js` is `near-api-js` bundled for the browser (`npm run build:web`; source in `web/`).
 - `scripts/`: publish, create vault, run the flows, build the evidence report. They need a funded testnet key in `secrets/` (gitignored).
 - `build/opt.wasm`: the published code. `evidence/`: recorded chain responses.
 
