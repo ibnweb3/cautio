@@ -1,4 +1,4 @@
-//! TenancyVault: a rental caution-deposit vault with no admin and no keys.
+//! Cautio: a rental caution-deposit vault with no admin and no keys.
 //!
 //! Intended use: deployed as a NEAR *deterministic account* (DeterministicStateInit)
 //! from a global contract referenced BY CODE HASH, so the account has no access keys

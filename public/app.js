@@ -137,8 +137,8 @@ $("#verify-form").addEventListener("submit", async (e) => {
       : row("fail", "FAIL", `Access keys: ${keys.keys.length} found. This account is not keyless.`));
     if (gh) {
       rows.push(gh === cfg.pinnedCodeHash
-        ? row("pass", "PASS", "Code is referenced by hash and matches the pinned TenancyVault hash: ", code(gh))
-        : row("fail", "FAIL", "Code hash differs from the pinned TenancyVault hash. Account: ", code(gh), " pinned: ", code(cfg.pinnedCodeHash)));
+        ? row("pass", "PASS", "Code is referenced by hash and matches the pinned Cautio hash: ", code(gh))
+        : row("fail", "FAIL", "Code hash differs from the pinned Cautio hash. Account: ", code(gh), " pinned: ", code(cfg.pinnedCodeHash)));
       try {
         const g = await rpc("query", { request_type: "view_global_contract_code", finality: "final", code_hash: gh });
         const bin = Uint8Array.from(atob(g.code_base64), (c) => c.charCodeAt(0));

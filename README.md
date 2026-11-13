@@ -1,12 +1,12 @@
-# TenancyVault
+# Cautio
 
 A rental caution deposit that nobody can move by hand. It sits in a NEAR account with **no access keys**, running code that is referenced **by hash**. The tenant gets it back by default. The landlord can keep part of it only by filing a claim inside a fixed window, and an arbiter named in the lease settles disputes.
 
-Built for NEAR HACKATHON. Tracks: NFTs That Do Something, Real-World Money. **Testnet only.**
+Built for NEAR HACKATHON. (Renamed from "TenancyVault" before submission. The on-chain accounts, vaults and published code predate the rename and keep their addresses; the Rust crate in `contract/` is still called `tenancy-vault`.) Tracks: NFTs That Do Something, Real-World Money. **Testnet only.**
 
 ## The problem in 30 seconds
 
-Today the landlord holds the caution deposit. Getting it back after move-out is often slow or disputed, and the tenant has little leverage. TenancyVault takes the landlord's hands off the money:
+Today the landlord holds the caution deposit. Getting it back after move-out is often slow or disputed, and the tenant has little leverage. Cautio takes the landlord's hands off the money:
 
 1. Both sides agree the lease terms and a move-in condition report. Only a salted **hash** of them goes on chain (no names, addresses or photos).
 2. The deposit is paid into a vault account. Nobody holds a key to it.
@@ -54,7 +54,7 @@ Refund-by-default escrow can be written on other chains, and the projects above 
 
 Found by web search on 2026-11-12 from their own pages and papers; we have not tested them: **Trustless Work** (Stellar, used by the SafeTrust co-living platform), **Rentible** (Solidity, test deployment), **RxEAL** (Ethereum), **DeWork** (ETHGlobal Taipei prototype), **zk-Agreements** (arXiv). As far as we saw, they settle by mutual sign-off or an oracle or approver.
 
-What TenancyVault does differently:
+What Cautio does differently:
 
 - The vault has **no admin and no keys**: code by hash, no upgrade path.
 - **Refund by default**: silence from the landlord means the tenant is paid, and only the claimed part is ever locked.

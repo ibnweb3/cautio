@@ -1,4 +1,4 @@
-# TenancyVault: scope
+# Cautio: scope
 
 > Status at 2026-11-13: the plan below was followed except the Intents stub page (not built) and the on-chain runs of arbiter 2 and the recovery flow (unit tests only). See README and evidence/EVIDENCE.md for what actually ran.
 
