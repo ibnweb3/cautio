@@ -18,7 +18,7 @@
     <button role="tab" id="tab-account" aria-selected="false" aria-controls="panel-account">Account</button>
     <button role="tab" id="tab-how" aria-selected="false" aria-controls="panel-how">How it works</button>
   </div>
-  <span class="net">NEAR testnet</span>
+  <span class="net" id="net-tag">NEAR testnet</span>
 </nav>
 <header class="hero" role="img" aria-label="Aerial view of Ikoyi, Lagos, with houses, trees and the lagoon">
   <div class="hero-in">
@@ -53,7 +53,7 @@
       <dl class="kv" id="figures"></dl>
       <h3>Parties</h3>
       <dl class="kv" id="parties"></dl>
-      <p class="row"><button type="button" id="copy-link" class="quiet">Copy link to this vault</button><span id="copy-note" class="muted" role="status"></span></p>
+      <p class="row"><button type="button" id="copy-link" class="quiet">Copy link to this vault</button><button type="button" id="ics" class="quiet" hidden>Add deadlines to my calendar</button><span id="copy-note" class="muted" role="status"></span></p>
     </div>
 
     <div class="card">
@@ -63,20 +63,27 @@
       <p id="act-msg" class="msg" role="status"></p>
     </div>
 
+    <div class="card" id="nft-card" hidden>
+      <h2>Lease NFT</h2>
+      <p id="nft-text" class="muted"></p>
+      <div id="nft-actions"></div>
+      <p id="nft-msg" class="msg" role="status"></p>
+    </div>
+
     <div class="card">
       <h2>Checks against the chain</h2>
       <ul id="checks" class="checks"></ul>
       <details><summary>Raw vault state</summary><pre id="state" class="state"></pre></details>
     </div>
   </div>
-  <p id="vault-empty" class="card muted">Enter a vault address, or open one you created. Nothing is stored on our server: this page reads the NEAR testnet directly.</p>
+  <p id="vault-empty" class="card muted">Enter a vault address, or open one you created. Nothing is stored on our server: this page reads the NEAR chain directly.</p>
 </section>
 
 <!-- ============ OPEN A VAULT ============ -->
 <section id="panel-open" role="tabpanel" aria-labelledby="tab-open" hidden>
   <form id="open-form" class="card" autocomplete="off" novalidate>
     <h2>Open a vault</h2>
-    <p class="muted">Creates a real keyless vault on NEAR testnet. You sign with the account in <strong>Account</strong> tab; it only pays the fee and holds no power over the vault afterwards.</p>
+    <p class="muted">Creates a real keyless vault on the network shown at the top. The browser account in the <strong>Account</strong> tab signs it; it only pays the fee and holds no power over the vault afterwards.</p>
     <div class="fields">
       <div class="f"><label for="o-landlord">Landlord account</label><input id="o-landlord" name="landlord" required spellcheck="false" autocapitalize="none" placeholder="landlord.testnet"><button type="button" class="mini" data-me="o-landlord">Use my account</button></div>
       <div class="f"><label for="o-tenant">Tenant refund account</label><input id="o-tenant" name="tenant" required spellcheck="false" autocapitalize="none" placeholder="tenant.testnet"><button type="button" class="mini" data-me="o-tenant">Use my account</button></div>
@@ -97,14 +104,29 @@
   </form>
 </section>
 
-<!-- ============ MY ACCOUNT ============ -->
+<!-- ============ ACCOUNT ============ -->
 <section id="panel-account" role="tabpanel" aria-labelledby="tab-account" hidden>
   <div class="card">
-    <h2>My testnet account</h2>
-    <p class="banner-note"><strong>Testnet only.</strong> Your key is created and kept in this browser (local storage). Anyone with access to this browser profile can use it. Never put a mainnet key here. Clearing site data deletes it, so export a copy.</p>
+    <h2>Wallet</h2>
+    <p class="muted">Connect a NEAR wallet to pay in, declare handover, file claims and rule with your own account. Your wallet signs every transaction and the key never reaches this page.</p>
+    <div id="wallet-none"><div class="row"><button type="button" class="primary" id="wallet-connect">Connect wallet</button></div></div>
+    <div id="wallet-have" hidden>
+      <dl class="kv">
+        <dt>Wallet account</dt><dd class="addr" id="wallet-id"></dd>
+        <dt>Balance</dt><dd class="num" id="wallet-bal"></dd>
+      </dl>
+      <div class="row"><button type="button" id="wallet-disconnect" class="quiet">Disconnect</button></div>
+      <div id="acting-row" class="f" hidden><label for="acting">Act as</label>
+        <select id="acting"><option value="wallet">Wallet account</option><option value="key">Browser account</option></select></div>
+    </div>
+    <p id="wallet-msg" class="msg" role="status"></p>
+  </div>
+  <div class="card">
+    <h2>Browser account</h2>
+    <p class="banner-note" id="key-note"><strong>Used for opening vaults, and as a quick test account.</strong> Wallets cannot create this kind of keyless vault yet, so opening one is signed by a key kept in this browser (local storage). It only pays the fee and holds no power over the vault. Keep little in it. Clearing site data deletes it, so export a copy.</p>
     <div id="acct-none" hidden>
-      <div class="row"><button type="button" class="primary" id="acct-new">Create an account</button></div>
-      <details><summary>I already have a testnet key</summary>
+      <div class="row"><button type="button" class="primary" id="acct-new">Create a browser account</button></div>
+      <details><summary>I already have a key</summary>
         <form id="import-form" autocomplete="off" class="stack">
           <label for="import-key">Private key (ed25519:...)</label>
           <input id="import-key" type="password" autocomplete="off" spellcheck="false" required>
@@ -127,6 +149,15 @@
       </div>
       <pre id="acct-secret" class="state" hidden></pre>
       <p class="muted" id="acct-hint"></p>
+      <form id="topup-form" class="actform" autocomplete="off" hidden>
+        <div class="f"><label for="topup-amt">Top up from your wallet (NEAR)</label><input id="topup-amt" value="0.3" inputmode="decimal" required></div>
+        <button type="submit">Send from wallet</button>
+      </form>
+      <form id="name-form" class="actform" autocomplete="off" hidden>
+        <p class="muted hint">Issuing a lease NFT needs a named account (like <code>landlord.testnet</code>), because named accounts can own unit sub-accounts. This creates one with the same key and switches to it. The old address keeps whatever NEAR it has.</p>
+        <div class="f"><label for="name-in">Name</label><input id="name-in" placeholder="myplace" spellcheck="false" autocapitalize="none" required></div>
+        <button type="submit">Create named account</button>
+      </form>
     </div>
     <p id="acct-msg" class="msg" role="status"></p>
   </div>
@@ -153,19 +184,19 @@
     </ul>
     <h2>What this does not do</h2>
     <ul>
-      <li>It runs on NEAR testnet only. The money is test tokens. Mainnet use needs a real wallet flow, an audit and legal review that have not been done.</li>
+      <li>This deployment runs on NEAR testnet. The money is test tokens. Before real money: an independent audit of the contract and a legal review, neither done.</li>
       <li>It does not replace a court. It is a private contract between the parties. We have not checked how Nigerian courts would treat it.</li>
       <li>Disputes still need a human arbiter, and an arbiter can be wrong.</li>
       <li>Landlords must choose to use it. We have not verified that any would.</li>
-      <li>There is no naira rail. Intended for dollar-quoted rentals.</li>
+      <li>The vault holds NEAR, which moves in price. There is no naira rail and no stablecoin version yet.</li>
       <li>Paying in from other chains through NEAR Intents is not built: Intents has no testnet.</li>
-      <li>The key in <em>Account</em> tab sits in your browser's local storage. That is fine for testnet and not for real money.</li>
+      <li>Wallets cannot create keyless vaults yet, so opening one is signed by a small key in your browser. It only pays the fee and has no power over the vault. Paying in, claims and rulings are signed by your wallet.</li>
     </ul>
   </div>
 </section>
 </main>
 
-<footer class="wrap foot">Built for NEAR HACKATHON, testnet only. MIT licence. <a href="https://github.com/ibnweb3/cautio">Source</a>. Photo: Ikoyi, Lagos, by Reginald Bassey, <a href="https://commons.wikimedia.org/wiki/File:Ikoyi,_Lagos,_Nigeria.jpg">CC BY-SA 4.0</a>.</footer>
+<footer class="wrap foot">Built for the NEAR Hackathon. MIT licence. <a href="https://github.com/ibnweb3/cautio">Source</a>. Photo: Ikoyi, Lagos, by Reginald Bassey, <a href="https://commons.wikimedia.org/wiki/File:Ikoyi,_Lagos,_Nigeria.jpg">CC BY-SA 4.0</a>.</footer>
 <script type="module" src="app.js"></script>
 </body>
 </html>

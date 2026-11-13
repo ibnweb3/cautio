@@ -149,3 +149,7 @@ header.hero{background:linear-gradient(180deg,rgba(0,0,0,.45) 0%,rgba(0,0,0,.30)
 .hero .lede{color:#fff;font-weight:450;font-size:1.12rem;line-height:1.55}
 button.cta,button.cta.ghost{text-shadow:none}
 button.cta.ghost{background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.45)}
+.tag.info{color:var(--muted)}
+#acting-row{margin-top:12px;max-width:260px}
+#wallet-have .kv,#acct-have .kv{margin-bottom:6px}
+.actform .hint{margin:0}

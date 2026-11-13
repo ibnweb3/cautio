@@ -1,13 +1,14 @@
-import { Account, JsonRpcProvider, KeyPairSigner, KeyPair, DeterministicStateInit } from "./near.bundle.js";
+import { Account, JsonRpcProvider, KeyPairSigner, KeyPair, DeterministicStateInit, NearConnector, actions } from "./near.bundle.js";
 import { encodeState, b58, sha256Hex, sha256, utf8, parseNear, fmtNear, toHex } from "./state.js";
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); Object.assign(e, props); for (const k of kids) e.append(k); return e; };
-const EXPLORER = "https://testnet.nearblocks.io";
 const NS = 1_000_000n; // ns per millisecond
 const PHASES = ["Open: waiting for the deposit", "Handed over: landlord's claim window", "Claim filed: waiting for the arbiter", "Settled"];
 
-let cfg = { rpc: "https://test.rpc.fastnear.com", pinnedCodeHash: "", vault: null };
+let cfg = { network: "testnet", label: "NEAR testnet", rpc: "https://test.rpc.fastnear.com", explorer: "https://testnet.nearblocks.io", pinnedCodeHash: "", legacyCodeHashes: [], vault: null };
+const EXPLORER = () => cfg.explorer;
+const netName = () => cfg.network;
 let provider;
 let me = null;          // { id, secret }
 let current = null;     // { id, state, acc }
@@ -47,6 +48,8 @@ async function viewCall(id, method, args = {}) {
   const r = await rpc("query", { request_type: "call_function", finality: "optimistic", account_id: id, method_name: method, args_base64: btoa(JSON.stringify(args)) });
   return JSON.parse(new TextDecoder().decode(Uint8Array.from(r.result)));
 }
+let connector = null, wallet = null, acting = "key"; // wallet = { id }
+const actorId = () => (acting === "wallet" && wallet ? wallet.id : me ? me.id : null);
 const signerAccount = () => new Account(me.id, provider, new KeyPairSigner(KeyPair.fromString(me.secret)));
 const short = (s) => (s.length > 22 ? s.slice(0, 10) + "…" + s.slice(-8) : s);
 const ACCOUNT_RE = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
@@ -71,13 +74,22 @@ function newAccount() {
   saveMe(); refreshAccount(); renderActions();
 }
 async function refreshAccount() {
+  $("#wallet-none").hidden = !!wallet; $("#wallet-have").hidden = !wallet;
+  $("#acting-row").hidden = !(wallet && me);
+  if (wallet) {
+    $("#wallet-id").textContent = wallet.id;
+    $("#acting").value = acting;
+    getBalance(wallet.id).then((b) => { $("#wallet-bal").textContent = b === null ? "0 NEAR (account does not exist on " + netName() + " yet)" : fmtNear(b) + " NEAR"; });
+  }
   $("#acct-none").hidden = !!me; $("#acct-have").hidden = !me;
+  $("#topup-form").hidden = !(me && wallet);
+  $("#name-form").hidden = !(me && /^[0-9a-f]{64}$/.test(me.id) && cfg.registrar);
   if (!me) return;
   $("#acct-id").textContent = me.id;
   const b = await getBalance(me.id);
-  $("#acct-bal").textContent = b === null ? "0 NEAR (account does not exist on testnet yet)" : fmtNear(b) + " NEAR";
+  $("#acct-bal").textContent = b === null ? "0 NEAR (account does not exist on " + netName() + " yet)" : fmtNear(b) + " NEAR";
   $("#acct-hint").textContent = b === null || b < 10n ** 23n
-    ? "This account is empty. Send testnet NEAR to the address above from a testnet faucet or any funded testnet account. About 0.2 NEAR is enough to open a vault and make several calls."
+    ? "This account is empty. Send NEAR to the address above" + (cfg.network === "testnet" ? " from a testnet faucet or any funded testnet account" : "") + ". About 0.2 NEAR is enough to open a vault and make several calls."
     : "";
 }
 $("#acct-new").addEventListener("click", newAccount);
@@ -144,13 +156,14 @@ const row = (cls, tag, ...kids) => el("li", {}, el("span", { className: "tag " +
 const code = (t) => el("code", { textContent: t });
 
 function roleList(s) {
-  if (!me) return [];
+  const aid = actorId();
+  if (!aid) return [];
   const r = [];
-  if (me.id === s.landlord) r.push("landlord");
-  if (me.id === (s.redirected ? s.recovery : s.tenant)) r.push("tenant");
-  if (me.id === s.recovery) r.push("recovery");
-  if (me.id === s.arbiter1) r.push("arbiter1");
-  if (me.id === s.arbiter2) r.push("arbiter2");
+  if (aid === s.landlord) r.push("landlord");
+  if (aid === (s.redirected ? s.recovery : s.tenant)) r.push("tenant");
+  if (aid === s.recovery) r.push("recovery");
+  if (aid === s.arbiter1) r.push("arbiter1");
+  if (aid === s.arbiter2) r.push("arbiter2");
   return r;
 }
 
@@ -166,7 +179,7 @@ async function loadVault(id, quiet = false) {
     state = await viewCall(id, "get_state");
   } catch (x) {
     $("#vault-empty").hidden = false; view.hidden = true;
-    $("#vault-empty").textContent = /does not exist/i.test(String(x.message)) ? "No account with that address exists on testnet." : "That account is not a Cautio vault, or the chain could not be read: " + friendly(x);
+    $("#vault-empty").textContent = /does not exist/i.test(String(x.message)) ? "No account with that address exists on " + netName() + "." : "That account is not a Cautio vault, or the chain could not be read: " + friendly(x);
     return;
   }
   current = { id, state, acc };
@@ -210,20 +223,42 @@ function renderVault() {
     ["Arbiter 2", label("arbiter2", s.arbiter2), "addr"],
   ]);
   $("#state").textContent = JSON.stringify(s, null, 2);
+  $("#ics").hidden = deadlines(s).length === 0;
   renderActions();
+  renderNft();
 }
 
 // ---------- actions ----------
-const GAS = { fund: 20, declare_handover: 20, file_claim: 40, withdraw_claim: 40, accept_claim: 40, release: 40, rule: 40 };
+const GAS = { fund: 20, declare_handover: 20, file_claim: 40, withdraw_claim: 40, accept_claim: 40, release: 40, rule: 40, start_recovery: 20, cancel_recovery: 20, complete_recovery: 20 };
+const T12 = 10n ** 12n;
+// One transaction with several actions, signed by the connected wallet or by the browser key.
+async function sendTx(receiverId, specs) {
+  if (acting === "wallet" && wallet) {
+    const acts = specs.map((a) => a.t === "create" ? { type: "CreateAccount" }
+      : a.t === "transfer" ? { type: "Transfer", params: { deposit: a.deposit.toString() } }
+      : a.t === "global" ? { type: "UseGlobalContract", params: { contractIdentifier: { codeHash: a.codeHash } } }
+      : { type: "FunctionCall", params: { methodName: a.method, args: a.args, gas: (BigInt(a.gas) * T12).toString(), deposit: (a.deposit || 0n).toString() } });
+    const w = await connector.wallet();
+    const out = await w.signAndSendTransaction({ signerId: wallet.id, receiverId, actions: acts });
+    if (out && out.status && out.status.Failure) throw new Error(JSON.stringify(out.status.Failure));
+    return (out.transaction && out.transaction.hash) || (out.transaction_outcome && out.transaction_outcome.id);
+  }
+  const acts = specs.map((a) => a.t === "create" ? actions.createAccount()
+    : a.t === "transfer" ? actions.transfer(a.deposit)
+    : a.t === "global" ? actions.useGlobalContract({ codeHash: a.codeHash })
+    : actions.functionCall(a.method, a.args, BigInt(a.gas) * T12, a.deposit || 0n));
+  const r = await signerAccount().signAndSendTransaction({ receiverId, actions: acts });
+  return r.transaction.hash;
+}
+const callContract = (contractId, method, args, deposit, gasT) => sendTx(contractId, [{ t: "call", method, args, deposit, gas: gasT }]);
 async function send(method, args, depositYocto = 0n, doneText = "Done.") {
   const msg = $("#act-msg");
   say(msg, "Sending to the network…");
   for (const b of document.querySelectorAll("#actions button")) b.disabled = true;
   try {
-    const r = await signerAccount().callFunctionRaw({ contractId: current.id, methodName: method, args, deposit: depositYocto, gas: BigInt(GAS[method]) * 10n ** 12n });
-    const tx = r.transaction.hash;
+    const tx = await callContract(current.id, method, args, depositYocto, GAS[method]);
     msg.className = "msg";
-    msg.replaceChildren(doneText + " ", el("a", { href: `${EXPLORER}/txns/${tx}`, target: "_blank", rel: "noopener", textContent: "View transaction" }));
+    msg.replaceChildren(doneText + " ", el("a", { href: `${EXPLORER()}/txns/${tx}`, target: "_blank", rel: "noopener", textContent: "View transaction" }));
   } catch (x) { say(msg, friendly(x), true); }
   await loadVault(current.id, true);
 }
@@ -258,12 +293,14 @@ function renderActions() {
   if (!current) return;
   const s = current.state, roles = roleList(s), has = (r) => roles.includes(r);
   const held = BigInt(s.held), cap = BigInt(s.cap);
-  $("#you").textContent = !me
-    ? "You have no account yet. Create one in the Account tab to act on a vault."
-    : roles.length ? `You are signed in as ${short(me.id)}: ${roles.join(", ").replace("arbiter1", "arbiter 1").replace("arbiter2", "arbiter 2")}.` : `You are signed in as ${short(me.id)}. You are not a named party in this vault, but anyone can pay in the deposit or trigger a refund.`;
+  const aid = actorId();
+  const via = acting === "wallet" && wallet ? "your wallet" : "this browser";
+  $("#you").textContent = !aid
+    ? "No account connected. Connect a wallet or create a browser account in the Account tab to act on a vault."
+    : roles.length ? `Acting as ${short(aid)} (${via}): ${roles.join(", ").replace("arbiter1", "arbiter 1").replace("arbiter2", "arbiter 2")}.` : `Acting as ${short(aid)} (${via}). You are not a named party in this vault, but anyone can pay in the deposit or trigger a refund.`;
   const winEnd = BigInt(s.handover_at) + BigInt(s.claim_window_ns);
   const winOpen = nowNs() <= winEnd;
-  const needAccount = !me;
+  const needAccount = !aid;
   if (needAccount && s.phase < 3) { box.append(el("p", { className: "muted", textContent: "No actions available without an account." })); return; }
 
   if (s.phase === 0) {
@@ -285,7 +322,9 @@ function renderActions() {
       const f = i.file.files[0];
       const hash = f ? await sha256Hex(new Uint8Array(await f.arrayBuffer())) : await sha256Hex(i.note.value.trim());
       if (!f && !i.note.value.trim()) throw new Error("Write the move-out report, or choose a file.");
-      await send("file_claim", { amount: y.toString(), kind: Number(i.kind.value), report_hash: hash }, 0n, "Claim filed. The undisputed rest was refunded.");
+      const rec = { vault: current.id, filedBy: actorId(), amountYocto: y.toString(), kind: Number(i.kind.value) === 0 ? "damage" : "service charge", reportSha256: hash, report: f ? { fileName: f.name, bytes: f.size, note: "Keep the original file: its SHA-256 must match reportSha256." } : i.note.value.trim(), createdAt: new Date().toISOString() };
+      el("a", { href: URL.createObjectURL(new Blob([JSON.stringify(rec, null, 2)], { type: "application/json" })), download: `cautio-claim-${hash.slice(0, 10)}.json` }).click();
+      await send("file_claim", { amount: y.toString(), kind: Number(i.kind.value), report_hash: hash }, 0n, "Claim filed. A copy of your report was downloaded: keep it, the chain holds only its hash. The undisputed rest was refunded.");
     }));
     if (!winOpen) box.append(act("Trigger refund", "The window closed with no claim. Anyone can send the deposit back to the tenant.", [], () => send("release", {}, 0n, "Refund triggered."), true));
     if (winOpen && !has("landlord")) box.append(el("p", { className: "muted", textContent: "Waiting for the claim window to close. Only the landlord can act now." }));
@@ -306,6 +345,17 @@ function renderActions() {
       }));
     } else if (has("arbiter2")) box.append(el("p", { className: "muted", textContent: `Arbiter 2 can rule from ${t2(BigInt(s.claim_at) + BigInt(s.arbiter_sla_ns))}.` }));
   }
+  if (s.phase < 3) {
+    const recAt = BigInt(s.recovery_at), tl = BigInt(s.recovery_timelock_ns);
+    if (!s.redirected && has("recovery") && recAt === 0n) box.append(act("Start recovery", `Use this if the tenant lost their key. After ${dur(tl)} with no objection you can take over the tenant's refund address. The tenant can cancel while the wait runs.`, [], () => send("start_recovery", {}, 0n, "Recovery started."), false));
+    if (!s.redirected && recAt > 0n) {
+      const ready = nowNs() >= recAt + tl;
+      if (has("recovery")) box.append(ready
+        ? act("Complete recovery", "The waiting time is over and the tenant did not cancel. Redirect the tenant's refund to the recovery account.", [], () => send("complete_recovery", {}, 0n, "Recovery complete: refunds now go to the recovery account."), false)
+        : el("p", { className: "muted", textContent: `Recovery started. You can complete it in ${left(recAt + tl)}.` }));
+      if (aid === s.tenant) box.append(act("Cancel recovery", `Someone started recovery of your refund address (waiting time ends ${t2(recAt + tl)}). If that is not you, cancel now.`, [], () => send("cancel_recovery", {}, 0n, "Recovery cancelled."), true));
+    }
+  }
   if (!box.children.length) box.append(el("p", { className: "muted", textContent: s.phase === 3 ? "Nothing more to do: this vault is settled." : "No actions for your account right now." }));
 }
 
@@ -318,7 +368,7 @@ async function runChecks(id, acc, state) {
     const keys = await rpc("query", { request_type: "view_access_key_list", finality: "final", account_id: id });
     rows.push(keys.keys.length === 0 ? row("pass", "PASS", "Access keys: none. No one holds a key to this account.") : row("fail", "FAIL", `Access keys: ${keys.keys.length} found. This account is not keyless.`));
     if (gh) {
-      rows.push(gh === cfg.pinnedCodeHash ? row("pass", "PASS", "Code is referenced by hash and matches the pinned Cautio hash: ", code(gh)) : row("fail", "FAIL", "Code hash differs from the pinned Cautio hash. Account: ", code(gh)));
+      rows.push(gh === cfg.pinnedCodeHash ? row("pass", "PASS", "Code is referenced by hash and matches the pinned Cautio hash: ", code(gh)) : (cfg.legacyCodeHashes || []).includes(gh) ? row("info", "OLDER", "Code matches an older published Cautio build (same rules; its error messages show as a generic failure): ", code(gh)) : row("fail", "FAIL", "Code hash differs from the pinned Cautio hash. Account: ", code(gh)));
       try {
         const g = await rpc("query", { request_type: "view_global_contract_code", finality: "final", code_hash: gh });
         const bin = Uint8Array.from(atob(g.code_base64), (c) => c.charCodeAt(0));
@@ -327,11 +377,12 @@ async function runChecks(id, acc, state) {
     } else if (ga) rows.push(row("fail", "FAIL", "Code is referenced by publisher account " + ga + ". The publisher could change it."));
     else rows.push(row("fail", "FAIL", "This account does not use a global contract by hash."));
     rows.push(row("info", "INFO", `Account balance ${fmtNear(acc.amount)} NEAR; the vault tracks ${fmtNear(state.held)} NEAR as held. The difference is the small storage buffer.`));
-    if (cfg.unit && id === cfg.vault) {
+    const ref = (cfg.unit && id === cfg.vault) ? { unit: cfg.unit, token: cfg.token } : nftRef(id);
+    if (ref) {
       try {
-        const u = await rpc("query", { request_type: "view_account", finality: "final", account_id: cfg.unit });
-        const tok = await viewCall(cfg.unit, "nft_token", { token_id: cfg.token });
-        rows.push(row("pass", "PASS", "Lease NFT ", code(`${cfg.unit} / ${tok.token_id}`), " is owned by ", code(tok.owner_id), tok.owner_id === state.tenant ? " (the vault's tenant)." : " (not the vault's tenant)."));
+        const u = await rpc("query", { request_type: "view_account", finality: "final", account_id: ref.unit });
+        const tok = await viewCall(ref.unit, "nft_token", { token_id: ref.token });
+        rows.push(row("pass", "PASS", "Lease NFT ", code(`${ref.unit} / ${tok.token_id}`), " is owned by ", code(tok.owner_id), tok.owner_id === state.tenant ? " (the vault's tenant)." : " (not the vault's tenant)."));
         rows.push(row("info", "INFO", "Unit account runs standard NEP-171 code referenced by hash: ", code(String(u.global_contract_hash))));
       } catch (x) { rows.push(row("info", "INFO", "Could not read the lease NFT: " + x.message)); }
     }
@@ -348,8 +399,9 @@ async function updateOpenCost() {
     : "You need an account first: open the Account tab and create one.";
 }
 for (const b of document.querySelectorAll("[data-me]")) b.addEventListener("click", () => {
-  if (!me) { say($("#open-msg"), "Create an account in the Account tab first.", true); return; }
-  $("#" + b.dataset.me).value = me.id;
+  const a = actorId() || (me && me.id);
+  if (!a) { say($("#open-msg"), "Connect a wallet or create an account in the Account tab first.", true); return; }
+  $("#" + b.dataset.me).value = a;
 });
 
 $("#open-form").addEventListener("submit", async (e) => {
@@ -370,8 +422,8 @@ $("#open-form").addEventListener("submit", async (e) => {
     const terms = v.terms.trim(); if (!terms) throw new Error("Paste the lease terms. Only their hash goes on chain.");
     say(msg, "Checking the accounts…"); btn.disabled = true;
     const [bal, tb, rb] = await Promise.all([getBalance(me.id), getBalance(ids.tenant), getBalance(ids.recovery)]);
-    if (tb === null) throw new Error("The tenant refund account does not exist on testnet yet. A refund to a missing account would fail, so fund or create it first.");
-    if (rb === null) throw new Error("The recovery account does not exist on testnet yet. Fund or create it first.");
+    if (tb === null) throw new Error("The tenant refund account does not exist on " + netName() + " yet. A refund to a missing account would fail, so fund or create it first.");
+    if (rb === null) throw new Error("The recovery account does not exist on " + netName() + " yet. Fund or create it first.");
     if (bal === null || bal < OPEN_BUFFER + 10n ** 22n) throw new Error("Your account needs at least about 0.07 NEAR. See the Account tab.");
     const salt = toHex(crypto.getRandomValues(new Uint8Array(16)));
     const doc = JSON.stringify({ lease: terms, salt, created: new Date().toISOString() });
@@ -382,7 +434,7 @@ $("#open-form").addEventListener("submit", async (e) => {
     };
     const stateInit = new DeterministicStateInit({ code: { codeHash: cfg.pinnedCodeHash }, data: [[utf8("STATE"), encodeState(state)]] });
     const vaultId = stateInit.deriveAccountId();
-    say(msg, "Creating the vault on testnet…");
+    say(msg, "Creating the vault on " + netName() + "…");
     const r = await signerAccount().createDeterministicAccount({ stateInit, deposit: OPEN_BUFFER });
     const tx = r.transaction.hash;
     // the new account can lag a moment behind the transaction result
@@ -397,20 +449,122 @@ $("#open-form").addEventListener("submit", async (e) => {
       el("h3", { textContent: "Vault created" }),
       el("p", { className: "addr", textContent: vaultId }),
       el("p", { className: "muted", textContent: "Keep the terms file. The chain holds only its hash; you need the exact file to prove later what was agreed. Share the vault address with the other parties." }),
-      el("div", { className: "row" }, go, dl, el("a", { href: `${EXPLORER}/txns/${tx}`, target: "_blank", rel: "noopener", textContent: "View transaction" })),
+      el("div", { className: "row" }, go, dl, el("a", { href: `${EXPLORER()}/txns/${tx}`, target: "_blank", rel: "noopener", textContent: "View transaction" })),
     );
     say(msg, ok ? "Done." : "Created. The network is still catching up; open the vault in a few seconds.");
   } catch (x) { say(msg, friendly(x), true); }
   btn.disabled = false;
 });
 
+// ---------- wallet ----------
+function setWallet(id) {
+  wallet = id ? { id } : null;
+  acting = wallet ? "wallet" : "key";
+  refreshAccount(); renderActions();
+}
+function initWallet() {
+  try {
+    connector = new NearConnector({ network: cfg.network === "mainnet" ? "mainnet" : "testnet" });
+    connector.on("wallet:signIn", (t) => { setWallet(t.accounts[0].accountId); say($("#wallet-msg"), "Wallet connected."); });
+    connector.on("wallet:signOut", () => setWallet(null));
+    connector.getConnectedWallet().then((c) => { if (c && c.accounts && c.accounts[0]) setWallet(c.accounts[0].accountId); }).catch(() => {});
+  } catch (x) { connector = null; say($("#wallet-msg"), "Wallet support could not start in this browser: " + x.message, true); }
+}
+$("#wallet-connect").addEventListener("click", async () => {
+  if (!connector) return say($("#wallet-msg"), "Wallet support is not available in this browser.", true);
+  try { await connector.connect(); } catch (x) { say($("#wallet-msg"), "Could not connect: " + String(x && x.message || x).slice(0, 160), true); }
+});
+$("#wallet-disconnect").addEventListener("click", async () => { try { await connector.disconnect(); } catch {} setWallet(null); });
+$("#acting").addEventListener("change", (e) => { acting = e.target.value; renderActions(); });
+
+$("#topup-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = $("#acct-msg");
+  try {
+    const y = parseNear($("#topup-amt").value); if (y <= 0n) throw new Error("Enter an amount above zero.");
+    say(msg, "Waiting for your wallet…");
+    const prev = acting; acting = "wallet";
+    try { await sendTx(me.id, [{ t: "transfer", deposit: y }]); } finally { acting = prev; }
+    say(msg, "Sent."); refreshAccount();
+  } catch (x) { say(msg, friendly(x), true); }
+});
+
+$("#name-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = $("#acct-msg");
+  try {
+    const label = $("#name-in").value.trim().toLowerCase();
+    if (!/^[a-z0-9]([a-z0-9_-]*[a-z0-9])?$/.test(label) || label.length < 6) throw new Error("Use at least 6 letters or digits (a-z, 0-9, - or _).");
+    const id = label + "." + cfg.registrar;
+    if ((await getBalance(id)) !== null) throw new Error(id + " is already taken. Try another name.");
+    say(msg, "Creating " + id + "…");
+    const kp = KeyPair.fromString(me.secret);
+    await signerAccount().callFunctionRaw({ contractId: cfg.registrar, methodName: "create_account", args: { new_account_id: id, new_public_key: kp.getPublicKey().toString() }, deposit: 3n * 10n ** 23n, gas: 60n * T12 });
+    me = { id, secret: me.secret }; saveMe();
+    say(msg, "Created " + id + ". It now holds 0.3 NEAR from your previous address."); refreshAccount(); renderActions();
+  } catch (x) { say(msg, friendly(x), true); }
+});
+
+// ---------- calendar ----------
+function deadlines(s) {
+  const out = [];
+  if (s.phase === 1) out.push(["Cautio: landlord claim window closes", BigInt(s.handover_at) + BigInt(s.claim_window_ns), "After this the deposit can be refunded to the tenant."]);
+  if (s.phase === 2) out.push(["Cautio: arbiter 2 may step in", BigInt(s.claim_at) + BigInt(s.arbiter_sla_ns), "If arbiter 1 has not ruled by now, arbiter 2 can."]);
+  if (s.phase < 3 && !s.redirected && BigInt(s.recovery_at) > 0n) out.push(["Cautio: recovery waiting time ends", BigInt(s.recovery_at) + BigInt(s.recovery_timelock_ns), "The recovery account can now take over the refund address unless the tenant cancels."]);
+  return out.filter(([, t]) => t > nowNs());
+}
+const icsTime = (ns) => new Date(Number(ns / NS)).toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+$("#ics").addEventListener("click", () => {
+  const link = location.origin + location.pathname + "#vault=" + current.id;
+  const ev = deadlines(current.state).map(([t, ns, d], i) => ["BEGIN:VEVENT", `UID:cautio-${current.id.slice(0, 12)}-${i}-${ns}@cautio`, `DTSTAMP:${icsTime(nowNs())}`, `DTSTART:${icsTime(ns)}`, `DTEND:${icsTime(ns + 900_000_000_000n)}`, `SUMMARY:${t}`, `DESCRIPTION:${d} ${link}`, "BEGIN:VALARM", "TRIGGER:-PT24H", "ACTION:DISPLAY", `DESCRIPTION:${t}`, "END:VALARM", "END:VEVENT"].join("\r\n"));
+  const txt = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Cautio//EN", ...ev, "END:VCALENDAR"].join("\r\n");
+  el("a", { href: URL.createObjectURL(new Blob([txt], { type: "text/calendar" })), download: "cautio-deadlines.ics" }).click();
+});
+
+// ---------- lease NFT ----------
+const nftKey = (v) => "cautio.nft." + v;
+function nftRef(v) { try { return JSON.parse(store.get(nftKey(v)) || "null"); } catch { return null; } }
+function renderNft() {
+  const card = $("#nft-card");
+  if (!current || !cfg.nftCodeHash) { card.hidden = true; return; }
+  const s = current.state, aid = actorId();
+  const ref = (cfg.unit && current.id === cfg.vault) ? { unit: cfg.unit, token: cfg.token } : nftRef(current.id);
+  const named = aid && !/^[0-9a-f]{64}$/.test(aid);
+  const box = $("#nft-actions"); box.replaceChildren();
+  card.hidden = false;
+  if (ref) { $("#nft-text").textContent = `The lease is recorded as NFT ${ref.token} on ${ref.unit}. It names this vault and the lease-terms hash, and its owner is checked below.`; return; }
+  if (aid !== s.landlord) { $("#nft-text").textContent = "No lease NFT is linked to this vault in this browser. The landlord can issue one from here."; return; }
+  if (!named) { $("#nft-text").textContent = "To issue a lease NFT the landlord needs a named account (like name.testnet), because only named accounts can own unit sub-accounts. Use a wallet with a named account, or create a named account in the Account tab."; return; }
+  $("#nft-text").textContent = "Optional. Creates a unit account under yours, running the standard NFT contract by hash, and mints the lease to the tenant. The NFT carries this vault's address and the terms hash. Costs about 0.13 NEAR.";
+  box.append(act("Issue lease NFT", "", [["unit", "Unit name", "unit-1", "text"], ["tok", "Token id", "lease-1", "text"]], async (i) => {
+    const unitLabel = i.unit.value.trim().toLowerCase(), tok = i.tok.value.trim();
+    if (!/^[a-z0-9]([a-z0-9_-]*[a-z0-9])?$/.test(unitLabel) || !tok) throw new Error("Give a unit name (letters, digits, - or _) and a token id.");
+    const unit = unitLabel + "." + aid, msg = $("#nft-msg");
+    if ((await getBalance(unit)) !== null) throw new Error(unit + " already exists. Pick another unit name.");
+    say(msg, "Creating the unit account…");
+    await sendTx(unit, [{ t: "create" }, { t: "transfer", deposit: 10n ** 23n }, { t: "global", codeHash: cfg.nftCodeHash }, { t: "call", method: "new_default_meta", args: { owner_id: aid }, gas: 30 }]);
+    say(msg, "Minting the lease NFT…");
+    const meta = { title: "Rental lease and caution deposit", description: "Lease record. The caution deposit sits in the keyless vault named in extra.", extra: JSON.stringify({ vault: current.id, vaultCodeHash: current.acc.global_contract_hash || null, termsHash: s.terms_hash }) };
+    const tx = await sendTx(unit, [{ t: "call", method: "nft_mint", args: { token_id: tok, token_metadata: meta, token_owner_id: s.tenant }, deposit: 2n * 10n ** 22n, gas: 40 }]);
+    store.set(nftKey(current.id), JSON.stringify({ unit, token: tok }));
+    msg.className = "msg"; msg.replaceChildren("Lease NFT minted to the tenant. ", el("a", { href: `${EXPLORER()}/txns/${tx}`, target: "_blank", rel: "noopener", textContent: "View transaction" }));
+    renderNft(); runChecks(current.id, current.acc, current.state);
+  }, true));
+}
+
 // ---------- boot ----------
 loadMe();
 fetch("config.json").then((r) => r.json()).then((c) => {
-  cfg = c;
+  const want = new URLSearchParams(location.search).get("network");
+  const net = c.networks && c.networks[want] ? want : c.network;
+  cfg = { ...cfg, ...c.networks[net], network: net };
+  $("#net-tag").textContent = cfg.label || net;
+  document.title = "Cautio · " + (cfg.label || net);
   provider = new JsonRpcProvider({ url: cfg.rpc });
+  if (!cfg.pinnedCodeHash) { $("#open-btn").disabled = true; say($("#open-msg"), "Cautio's contract is not published on " + net + " yet, so vaults cannot be opened here.", true); }
+  initWallet();
   renderRecent();
   const m = /#vault=([a-z0-9_.\-]+)/.exec(location.hash);
   if (m) openVault(m[1]);
   else if (cfg.vault) { $("#vault-id").value = cfg.vault; }
-}).catch(() => { $("#vault-empty").textContent = "Could not load config.json."; });
+}).catch((x) => { $("#vault-empty").textContent = "Could not load config.json: " + x.message; });

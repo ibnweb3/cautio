@@ -1,8 +1,29 @@
 {
   "network": "testnet",
-  "rpc": "https://test.rpc.fastnear.com",
-  "pinnedCodeHash": "2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM",
-  "vault": "0sbe62faf670eea0865bcc7cdb7536c1b670dc81d4",
-  "unit": "unit-4b.derby-tv-bldg.testnet",
-  "token": "lease-4b-1"
+  "networks": {
+    "testnet": {
+      "label": "NEAR testnet",
+      "rpc": "https://test.rpc.fastnear.com",
+      "explorer": "https://testnet.nearblocks.io",
+      "registrar": "testnet",
+      "pinnedCodeHash": "2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM",
+      "legacyCodeHashes": [],
+      "nftCodeHash": "ivu1e9obVRnMJLSvVPRgtYefUYUS1L3f5eYHjS86zL9",
+      "vault": "0sbe62faf670eea0865bcc7cdb7536c1b670dc81d4",
+      "unit": "unit-4b.derby-tv-bldg.testnet",
+      "token": "lease-4b-1"
+    },
+    "mainnet": {
+      "label": "NEAR mainnet",
+      "rpc": "https://free.rpc.fastnear.com",
+      "explorer": "https://nearblocks.io",
+      "registrar": "near",
+      "pinnedCodeHash": null,
+      "legacyCodeHashes": [],
+      "nftCodeHash": null,
+      "vault": null,
+      "unit": null,
+      "token": null
+    }
+  }
 }
