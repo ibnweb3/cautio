@@ -96,6 +96,7 @@ We did not build NEAR Intents pay-in (see below), so that part of the idea is no
 - Wallet connection through `@hot-labs/near-connect` (Meteor, Intear, Nightly, Ledger and others). Pay-in, handover, claims, rulings and recovery are signed by the wallet. **Not tested with a real wallet.** Wallets cannot create the keyless vault yet (no state-init action), so opening a vault is signed by a small key kept in the browser; it only pays the fee.
 - Network settings in `public/config.json` (testnet and mainnet blocks). Mainnet has no published contract hash yet, so the page refuses to open vaults there.
 - Lease NFT issued from the page by a landlord with a named account (creates a keyless unit sub-account on the standard NFT code by hash, mints to the tenant). Run live: see `evidence/browser-run.md`.
+- **Demo mode** (testnet only): a visitor with no wallet starts a real vault with 2-minute timers and switches between landlord, tenant, both arbiters and recovery to play every step. It uses shared throwaway accounts whose keys are public on purpose (`public/demo.json`, made by `scripts/make-demo-accounts.mjs`), so they can never hold anything of value. Run through end to end from the page on 2026-11-13 (pay in, handover, claim, arbiter ruling).
 - Recovery start, cancel and complete buttons. Calendar (.ics) reminders for deadlines. A claim-evidence copy downloaded when a claim is filed.
 
 ## Not built

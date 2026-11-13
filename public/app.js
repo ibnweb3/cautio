@@ -32,7 +32,7 @@ function showTab(id) {
 }
 for (const t of tabs) $("#tab-" + t).addEventListener("click", () => showTab(t));
 $("#cta-open").addEventListener("click", () => { showTab("open"); $("#panel-open").scrollIntoView({ behavior: "smooth" }); });
-$("#cta-how").addEventListener("click", () => { showTab("how"); $("#panel-how").scrollIntoView({ behavior: "smooth" }); });
+$("#cta-demo").addEventListener("click", () => { showTab("vault"); $("#demo-card").scrollIntoView({ behavior: "smooth" }); });
 
 // ---------- chain helpers ----------
 async function rpc(method, params) {
@@ -49,8 +49,10 @@ async function viewCall(id, method, args = {}) {
   return JSON.parse(new TextDecoder().decode(Uint8Array.from(r.result)));
 }
 let connector = null, wallet = null, acting = "key"; // wallet = { id }
-const actorId = () => (acting === "wallet" && wallet ? wallet.id : me ? me.id : null);
-const signerAccount = () => new Account(me.id, provider, new KeyPairSigner(KeyPair.fromString(me.secret)));
+let demo = null, demoKeys = null; // demo = { role }, demoKeys = shared throwaway accounts
+const actorId = () => (demo && demoKeys ? demoKeys[demo.role].id : acting === "wallet" && wallet ? wallet.id : me ? me.id : null);
+const payer = () => (demo && demoKeys ? demoKeys.landlord : me);
+const signerAccount = () => { const k = demo && demoKeys ? demoKeys[demo.role] : me; return new Account(k.id, provider, new KeyPairSigner(KeyPair.fromString(k.secret))); };
 const short = (s) => (s.length > 22 ? s.slice(0, 10) + "…" + s.slice(-8) : s);
 const ACCOUNT_RE = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
 const validAccount = (s) => s.length >= 2 && s.length <= 64 && ACCOUNT_RE.test(s);
@@ -235,7 +237,7 @@ const GAS = { fund: 20, declare_handover: 20, file_claim: 40, withdraw_claim: 40
 const T12 = 10n ** 12n;
 // One transaction with several actions, signed by the connected wallet or by the browser key.
 async function sendTx(receiverId, specs) {
-  if (acting === "wallet" && wallet) {
+  if (acting === "wallet" && wallet && !demo) {
     const acts = specs.map((a) => a.t === "create" ? { type: "CreateAccount" }
       : a.t === "transfer" ? { type: "Transfer", params: { deposit: a.deposit.toString() } }
       : a.t === "global" ? { type: "UseGlobalContract", params: { contractIdentifier: { codeHash: a.codeHash } } }
@@ -291,12 +293,13 @@ function act(title, hint, fields, run, primary = true) {
 
 function renderActions() {
   const box = $("#actions"); if (!box) return;
+  demoRender();
   box.replaceChildren();
   if (!current) return;
   const s = current.state, roles = roleList(s), has = (r) => roles.includes(r);
   const held = BigInt(s.held), cap = BigInt(s.cap);
   const aid = actorId();
-  const via = acting === "wallet" && wallet ? "your wallet" : "this browser";
+  const via = demo ? "demo account" : acting === "wallet" && wallet ? "your wallet" : "this browser";
   $("#you").textContent = !aid
     ? "No account connected. Connect a wallet or create a browser account in the Account tab to act on a vault."
     : roles.length ? `Acting as ${short(aid)} (${via}): ${roles.join(", ").replace("arbiter1", "arbiter 1").replace("arbiter2", "arbiter 2")}.` : `Acting as ${short(aid)} (${via}). You are not a named party in this vault, but anyone can pay in the deposit or trigger a refund.`;
@@ -411,7 +414,7 @@ $("#open-form").addEventListener("submit", async (e) => {
   const f = e.target, v = Object.fromEntries(new FormData(f));
   const msg = $("#open-msg"), btn = $("#open-btn");
   try {
-    if (!me) throw new Error("Create an account first (Account tab). It pays the fee for opening the vault.");
+    if (!payer()) throw new Error("Create an account first (Account tab). It pays the fee for opening the vault.");
     const ids = { landlord: v.landlord.trim(), tenant: v.tenant.trim(), recovery: v.recovery.trim(), arbiter1: v.arbiter1.trim(), arbiter2: v.arbiter2.trim() };
     for (const [k, a] of Object.entries(ids)) if (!validAccount(a)) throw new Error(`${k}: that is not a valid account id.`);
     if (ids.landlord === ids.tenant) throw new Error("Landlord and tenant must be different accounts.");
@@ -423,7 +426,7 @@ $("#open-form").addEventListener("submit", async (e) => {
     for (const [k, n] of [["claim window", v.window], ["arbiter wait", v.sla], ["recovery wait", v.timelock]]) if (!(Number(n) >= 1)) throw new Error(`The ${k} must be at least 1.`);
     const terms = v.terms.trim(); if (!terms) throw new Error("Paste the lease terms. Only their hash goes on chain.");
     say(msg, "Checking the accounts…"); btn.disabled = true;
-    const [bal, tb, rb] = await Promise.all([getBalance(me.id), getBalance(ids.tenant), getBalance(ids.recovery)]);
+    const [bal, tb, rb] = await Promise.all([getBalance(payer().id), getBalance(ids.tenant), getBalance(ids.recovery)]);
     if (tb === null) throw new Error("The tenant refund account does not exist on " + netName() + " yet. A refund to a missing account would fail, so fund or create it first.");
     if (rb === null) throw new Error("The recovery account does not exist on " + netName() + " yet. Fund or create it first.");
     if (bal === null || bal < OPEN_BUFFER + 10n ** 22n) throw new Error("Your account needs at least about 0.07 NEAR. See the Account tab.");
@@ -437,7 +440,9 @@ $("#open-form").addEventListener("submit", async (e) => {
     const stateInit = new DeterministicStateInit({ code: { codeHash: cfg.pinnedCodeHash }, data: [[utf8("STATE"), encodeState(state)]] });
     const vaultId = stateInit.deriveAccountId();
     say(msg, "Creating the vault on " + netName() + "…");
+    const prevRole = demo && demo.role; if (demo) demo.role = "landlord";
     const r = await signerAccount().createDeterministicAccount({ stateInit, deposit: OPEN_BUFFER });
+    if (demo) demo.role = prevRole;
     const tx = r.transaction.hash;
     // the new account can lag a moment behind the transaction result
     let ok = false;
@@ -454,7 +459,8 @@ $("#open-form").addEventListener("submit", async (e) => {
       el("div", { className: "row" }, go, dl, el("a", { href: `${EXPLORER()}/txns/${tx}`, target: "_blank", rel: "noopener", textContent: "View transaction" })),
     );
     say(msg, ok ? "Done." : "Created. The network is still catching up; open the vault in a few seconds.");
-  } catch (x) { say(msg, friendly(x), true); }
+    if (window.__demoOpened) { window.__demoOpened(vaultId); window.__demoOpened = null; }
+  } catch (x) { say(msg, friendly(x), true); if (window.__demoFail) { window.__demoFail(x); window.__demoFail = null; } }
   btn.disabled = false;
 });
 
@@ -554,6 +560,68 @@ function renderNft() {
   }, true));
 }
 
+// ---------- demo mode ----------
+// Shared throwaway testnet accounts whose keys are public (public/demo.json). Lets a visitor play every role with no wallet.
+const DEMO_ROLES = [["landlord", "Landlord"], ["tenant", "Tenant"], ["arbiter1", "Arbiter 1"], ["arbiter2", "Arbiter 2"], ["recovery", "Recovery"]];
+const roleName = (r) => (DEMO_ROLES.find((x) => x[0] === r) || [0, r])[1];
+async function loadDemoKeys() {
+  try {
+    if (cfg.network !== "testnet") return null;
+    const j = await (await fetch("demo.json", { cache: "no-cache" })).json();
+    return j.accounts && j.accounts.landlord ? j.accounts : null;
+  } catch { return null; }
+}
+function demoNext(s) {
+  const held = BigInt(s.held), winEnd = BigInt(s.handover_at) + BigInt(s.claim_window_ns);
+  if (s.phase === 0 && held === 0n) return ["tenant", "Pay the deposit."];
+  if (s.phase === 0) return ["tenant", "Declare handover. This starts the landlord's claim window."];
+  if (s.phase === 1 && nowNs() <= winEnd) return ["landlord", `File a claim for part of the deposit (window closes in ${left(winEnd)}). Or wait for the window to close and anyone can trigger the full refund.`];
+  if (s.phase === 1) return ["tenant", "The window closed with no claim. Trigger the refund."];
+  if (s.phase === 2) return ["arbiter1", "Rule on the claim. Or switch to the tenant to accept it, or the landlord to withdraw it."];
+  return null;
+}
+function demoRender() {
+  const card = $("#demo-card");
+  if (!demoKeys) { card.hidden = true; return; }
+  card.hidden = false;
+  $("#demo-off").hidden = !!demo; $("#demo-on").hidden = !demo;
+  if (!demo) return;
+  $("#demo-roles").replaceChildren(...DEMO_ROLES.map(([r, label]) => {
+    const b = el("button", { type: "button", className: "chip" + (demo.role === r ? " on" : ""), textContent: label });
+    b.setAttribute("aria-pressed", String(demo.role === r));
+    b.addEventListener("click", () => { demo.role = r; demoRender(); renderActions(); if (current) renderVault(); });
+    return b;
+  }));
+  const n = current ? demoNext(current.state) : null;
+  const box = $("#demo-next"); box.replaceChildren();
+  if (!current) return;
+  if (!n) { box.textContent = "This vault is settled. Start another demo to try a different path."; return; }
+  box.append(el("strong", { textContent: "Next: " }), `${roleName(n[0])}. ${n[1]} `);
+  if (n[0] !== demo.role) { const b = el("button", { type: "button", className: "mini", textContent: "Switch to " + roleName(n[0]) }); b.addEventListener("click", () => { demo.role = n[0]; demoRender(); renderActions(); renderVault(); }); box.append(b); }
+}
+$("#demo-start").addEventListener("click", async () => {
+  const msg = $("#demo-msg"), btn = $("#demo-start");
+  if (!demoKeys) return;
+  btn.disabled = true; say(msg, "Setting up a demo vault on testnet… about 15 seconds.");
+  demo = { role: "landlord" };
+  try {
+    const set = (id, v) => { $("#" + id).value = v; };
+    set("o-landlord", demoKeys.landlord.id); set("o-tenant", demoKeys.tenant.id); set("o-recovery", demoKeys.recovery.id);
+    set("o-arb1", demoKeys.arbiter1.id); set("o-arb2", demoKeys.arbiter2.id);
+    set("o-cap", "0.3"); set("o-window", "2"); $("[name=windowUnit]").value = "m";
+    set("o-sla", "1"); $("[name=slaUnit]").value = "m"; set("o-timelock", "2"); $("[name=timelockUnit]").value = "m";
+    set("o-fee", "5"); set("o-terms", "Demo lease, flat 3B, 12 months. Move-in report v1. (Demo run " + new Date().toISOString() + ")");
+    const done = new Promise((res, rej) => { window.__demoOpened = res; window.__demoFail = rej; });
+    $("#open-form").requestSubmit();
+    const vaultId = await Promise.race([done, new Promise((_, rej) => setTimeout(() => rej(new Error("The vault took too long to appear. Try again.")), 60000))]);
+    sessionStorage.setItem("cautio.demo", "1");
+    say(msg, "Demo vault ready. You are the landlord. Follow the Next line below.");
+    openVault(vaultId); demo.role = "tenant"; demoRender();
+  } catch (x) { demo = null; say(msg, friendly(x), true); demoRender(); }
+  btn.disabled = false;
+});
+$("#demo-exit").addEventListener("click", () => { demo = null; sessionStorage.removeItem("cautio.demo"); demoRender(); renderActions(); if (current) renderVault(); });
+
 // ---------- boot ----------
 loadMe();
 fetch("config.json").then((r) => r.json()).then((c) => {
@@ -566,6 +634,7 @@ fetch("config.json").then((r) => r.json()).then((c) => {
   if (!cfg.pinnedCodeHash) { $("#open-btn").disabled = true; say($("#open-msg"), "Cautio's contract is not published on " + net + " yet, so vaults cannot be opened here.", true); }
   initWallet();
   renderRecent();
+  loadDemoKeys().then((k) => { demoKeys = k; demoRender(); });
   const m = /#vault=([a-z0-9_.\-]+)/.exec(location.hash);
   if (m) openVault(m[1]);
   else if (cfg.vault) { $("#vault-id").value = cfg.vault; }

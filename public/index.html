@@ -25,7 +25,7 @@
     <p class="eyebrow">Rental caution deposits</p>
     <h1>Your deposit,<br>held by no one.</h1>
     <p class="lede">It sits in a NEAR account with no keys, running code pinned by hash. Nobody can move it by hand. The tenant gets it back by default, unless the landlord files a claim in time.</p>
-    <div class="cta-row"><button type="button" id="cta-open" class="cta">Open a vault</button><button type="button" id="cta-how" class="cta ghost">How it works</button></div>
+    <div class="cta-row"><button type="button" id="cta-demo" class="cta">Try the demo</button><button type="button" id="cta-open" class="cta ghost">Open a vault</button></div>
   </div>
 </header>
 
@@ -33,6 +33,21 @@
 
 <!-- ============ VAULTS ============ -->
 <section id="panel-vault" role="tabpanel" aria-labelledby="tab-vault">
+  <div class="card" id="demo-card" hidden>
+    <div id="demo-off">
+      <h2>Try it in two minutes</h2>
+      <p class="muted">No wallet and no sign-up. This opens a real vault on NEAR testnet with short timers (2 minutes), and lets you switch between landlord, tenant and arbiters to play every step. It uses shared throwaway test accounts whose keys are public, so nothing here is private or valuable.</p>
+      <div class="row"><button type="button" class="primary" id="demo-start">Start a demo vault</button></div>
+    </div>
+    <div id="demo-on" hidden>
+      <p class="banner-note"><strong>Demo mode.</strong> Shared testnet accounts. Pick who you act as:</p>
+      <div id="demo-roles" class="chips"></div>
+      <p id="demo-next" class="hint"></p>
+      <div class="row"><button type="button" id="demo-exit" class="quiet">Exit demo</button></div>
+    </div>
+    <p id="demo-msg" class="msg" role="status"></p>
+  </div>
+
   <form id="lookup" class="card" autocomplete="off">
     <label for="vault-id">Vault address</label>
     <div class="row nowrap">
