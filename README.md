@@ -91,7 +91,7 @@ NEAR Intents pay-in from other chains (Intents has no testnet and we did not spe
 
 ## Rebuild the contract
 
-Rust nightly with `rust-src`, target `wasm32-unknown-unknown`, then `scripts/build.sh` (uses `-Z build-std` and `target-cpu=mvp` so the wasm uses only features NEAR accepts), then `wasm-opt --mvp-features -Oz`. A different toolchain gives a different hash.
+Rust nightly with `rust-src`, target `wasm32-unknown-unknown`, then `scripts/build.sh` (uses `-Z build-std` and `target-cpu=mvp` so the wasm uses only features NEAR accepts), then `wasm-opt --mvp-features -Oz`. On 2026-11-13 a fresh rebuild with these steps (Rust 1.100 nightly, binaryen 125) reproduced the published hash `2HRG5f…` exactly. A different toolchain will likely give a different hash.
 
 ## AI disclosure
 
