@@ -18,7 +18,7 @@ Today the landlord holds the caution deposit. Getting it back after move-out is 
 
 | Do | See |
 |---|---|
-| `npm test` | 7 simulator tests pass |
+| `npm test` | 8 simulator tests pass |
 | `cd contract && cargo test` (needs Rust) | 20 contract tests pass |
 | Open the site (or `python -m http.server -d public` and open the page), tab **Walk-through**: pay deposit as Anyone, declare handover as Tenant, file a 300 claim as Landlord, rule as Arbiter 1 | log shows every step; payouts add up to the amount held |
 | Tab **Verify on testnet** and press Check | live RPC checks: no access keys, code referenced by hash and re-hashed in your browser, `get_state`, and the lease NFT |
