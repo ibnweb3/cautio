@@ -30,6 +30,8 @@ function showTab(id) {
   if (id === "open") updateOpenCost();
 }
 for (const t of tabs) $("#tab-" + t).addEventListener("click", () => showTab(t));
+$("#cta-open").addEventListener("click", () => { showTab("open"); $("#panel-open").scrollIntoView({ behavior: "smooth" }); });
+$("#cta-how").addEventListener("click", () => { showTab("how"); $("#panel-how").scrollIntoView({ behavior: "smooth" }); });
 
 // ---------- chain helpers ----------
 async function rpc(method, params) {

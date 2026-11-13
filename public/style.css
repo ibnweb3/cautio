@@ -1,8 +1,8 @@
 :root{
-  --bg:#f3f2e8;--card:rgba(250,248,236,.9);--card-solid:#faf8ec;--ink:#25403a;--muted:#5b6d66;--line:rgba(37,64,58,.14);--accent:#2f5a49;--accent-ink:#faf8ec;--ok:#17653f;--bad:#a12626;--focus:#2b6cdf;
-  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sans:"DM Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--serif:"Fraunces",Georgia,"Times New Roman",serif;
+  --bg:#fafafa;--card:#fff;--card-solid:#fff;--ink:#111;--muted:rgba(17,17,17,.62);--line:rgba(17,17,17,.12);--accent:#111;--accent-ink:#fff;--lime:#eafc53;--ok:#17653f;--bad:#a12626;--focus:#2b6cdf;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sans:"Host Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--serif:var(--sans);
 }
-body{margin:0;background:#9fb7b4;color:var(--ink);font:16px/1.55 var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;-webkit-tap-highlight-color:transparent;padding-bottom:96px}
+body{margin:0;background:#fafafa;color:var(--ink);font:16px/1.55 var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;-webkit-tap-highlight-color:transparent;padding-bottom:96px}
 .scene{position:fixed;inset:0;z-index:-1;background:linear-gradient(rgba(243,242,232,.10),rgba(243,242,232,.10)),url(lagos.jpg) center 65%/cover no-repeat;background-color:#9fb7b4}
 h1{font-family:var(--serif);font-weight:400;font-size:clamp(2.2rem,6vw,3.4rem);line-height:1.08;margin:0 0 14px;letter-spacing:-.015em}
 .card,.banner{background:var(--card);border:1px solid rgba(255,255,255,.5);border-radius:18px;padding:20px;margin-bottom:16px;box-shadow:0 8px 30px rgba(20,40,35,.12);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
@@ -106,3 +106,37 @@ summary{cursor:pointer;color:var(--muted)}
 #open-done .addr{text-align:left}
 #open-done .row{gap:14px}
 #vault-empty{margin-top:0}
+
+/* ---- Profit-style layer: light page, rounded photo hero, floating pill nav, lime CTAs ---- */
+body{padding-bottom:0}
+.scene{display:none}
+h1,h2,h3{letter-spacing:-.03em}
+.card,.banner{background:#fff;border:1px solid var(--line);border-radius:24px;padding:24px;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+.banner{border-radius:16px}
+.topnav{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:20px;background:#fff;border-radius:999px;padding:8px 8px 8px 22px;box-shadow:0 6px 28px rgba(0,0,0,.10);max-width:calc(100vw - 24px)}
+.brand{position:static;background:none;box-shadow:none;border-radius:0;padding:0;font-weight:600;font-size:1.15rem;letter-spacing:-.03em;flex-direction:row;gap:8px;align-items:center;color:#111}
+.brand .mark{color:#111}
+.tabs{position:static;transform:none;display:flex;gap:2px;background:none;padding:0;border-radius:0;box-shadow:none;overflow-x:auto;max-width:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+.tabs button{border-radius:999px;color:var(--muted);padding:9px 14px;font-weight:400;border:0;background:none}
+.tabs button[aria-selected=true]{background:#f1f1f1;color:#111}
+.net{position:static;background:var(--lime);color:#111;border-radius:999px;padding:11px 20px;font-size:.9rem;letter-spacing:0;font-weight:500;white-space:nowrap}
+header.hero{position:relative;margin:12px;border-radius:32px;min-height:min(720px,88vh);padding:0;display:flex;align-items:flex-end;overflow:hidden;color:#fff;background:linear-gradient(180deg,rgba(0,0,0,.30) 0%,rgba(0,0,0,.08) 28%,rgba(0,0,0,.78) 100%),url(lagos.jpg) center 60%/cover no-repeat #3b4a44}
+.hero-in{padding:clamp(24px,5vw,64px);max-width:760px}
+.hero .eyebrow{color:rgba(255,255,255,.8);letter-spacing:.14em}
+.hero h1{font-family:var(--sans);font-weight:400;font-size:clamp(2.6rem,7vw,4.6rem);line-height:1.02;letter-spacing:-.045em;color:#fff;margin:0 0 18px}
+.hero .lede{color:rgba(255,255,255,.86);font-size:1.08rem;max-width:54ch}
+.cta-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px}
+button.cta{background:var(--lime);color:#111;border:0;border-radius:999px;padding:14px 26px;font-weight:500;font-size:1rem}
+button.cta.ghost{background:rgba(255,255,255,.16);color:#fff;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+main{padding-top:36px;padding-bottom:40px}
+button{border-radius:999px;background:#fff;padding:10px 18px}
+button.primary,#verify-btn{background:var(--lime);color:#111;border-color:var(--lime);font-weight:500}
+.seg button[aria-checked=true]{border-color:#111;box-shadow:inset 0 0 0 1px #111}
+.chip{background:#f1f1f1;border-radius:999px}
+.mini{color:#111}
+input,select,textarea{border-radius:14px;background:#fff}
+.banner-note{background:#f6fbd5;border-radius:14px}
+@media (hover:hover){button:hover{background:#f1f1f1}button.primary:hover,#verify-btn:hover,button.cta:hover{background:var(--lime);filter:brightness(.96)}.tabs button:not([aria-selected=true]):hover{background:#f6f6f6}}
+.foot{color:var(--muted);text-shadow:none;padding:8px 16px 40px}.foot a{color:#111}
+@media (max-width:760px){.topnav{gap:8px;padding:6px 6px 6px 14px}.net{display:none}.tabs button{padding:8px 9px;font-size:.86rem}.brand{font-size:1rem}header.hero{margin:8px;border-radius:24px}}
+.tabs{scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
