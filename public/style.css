@@ -140,3 +140,12 @@ input,select,textarea{border-radius:14px;background:#fff}
 .foot{color:var(--muted);text-shadow:none;padding:8px 16px 40px}.foot a{color:#111}
 @media (max-width:760px){.topnav{gap:8px;padding:6px 6px 6px 14px}.net{display:none}.tabs button{padding:8px 9px;font-size:.86rem}.brand{font-size:1rem}header.hero{margin:8px;border-radius:24px}}
 .tabs{scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
+
+/* legibility over the photo */
+header.hero{background:linear-gradient(180deg,rgba(0,0,0,.45) 0%,rgba(0,0,0,.30) 30%,rgba(0,0,0,.72) 62%,rgba(0,0,0,.88) 100%),url(lagos.jpg) center 60%/cover no-repeat #2b3631}
+.hero-in{text-shadow:0 1px 14px rgba(0,0,0,.55)}
+.hero .eyebrow{color:#fff;font-weight:500}
+.hero h1{font-weight:500}
+.hero .lede{color:#fff;font-weight:450;font-size:1.12rem;line-height:1.55}
+button.cta,button.cta.ghost{text-shadow:none}
+button.cta.ghost{background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.45)}
