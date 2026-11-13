@@ -4,6 +4,8 @@ A rental caution deposit that nobody can move by hand. It sits in a NEAR account
 
 Built for NEAR HACKATHON. (Renamed from "TenancyVault" before submission. The on-chain accounts, vaults and published code predate the rename and keep their addresses; the Rust crate in `contract/` is still called `tenancy-vault`.) Tracks: NFTs That Do Something, Real-World Money. **Testnet only.**
 
+Live demo: https://cautio.derbylabs.workers.dev (testnet).
+
 ## The problem in 30 seconds
 
 Today the landlord holds the caution deposit. Getting it back after move-out is often slow or disputed, and the tenant has little leverage. Cautio takes the landlord's hands off the money:
