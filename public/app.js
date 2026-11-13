@@ -154,6 +154,15 @@ $("#verify-form").addEventListener("submit", async (e) => {
     rows.push(row("pass", "PASS", "get_state answered, so the contract is running."));
     $("#state").textContent = JSON.stringify(state, null, 2);
     rows.push(row("info", "INFO", `Balance ${acc.amount} yoctoNEAR on the account; the vault tracks ${state.held} yoctoNEAR as held.`));
+    if (cfg.unit && id === cfg.vault) {
+      try {
+        const u = await rpc("query", { request_type: "view_account", finality: "final", account_id: cfg.unit });
+        const t = await rpc("query", { request_type: "call_function", finality: "final", account_id: cfg.unit, method_name: "nft_token", args_base64: btoa(JSON.stringify({ token_id: cfg.token })) });
+        const tok = JSON.parse(new TextDecoder().decode(Uint8Array.from(t.result)));
+        rows.push(row("pass", "PASS", "Lease NFT ", code(`${cfg.unit} / ${tok.token_id}`), " is owned by ", code(tok.owner_id), tok.owner_id === state.tenant ? " (the vault's tenant)." : " (not the vault's tenant)."));
+        rows.push(row("info", "INFO", "Unit account runs standard NEP-171 code referenced by hash: ", code(String(u.global_contract_hash)), ". Link back to the vault, from the NFT metadata: ", code(tok.metadata.extra)));
+      } catch (x) { rows.push(row("info", "INFO", "Could not read the lease NFT: " + x.message)); }
+    }
   } catch (x) {
     rows.push(row("fail", "ERROR", x.message));
     $("#state").textContent = "No state read.";

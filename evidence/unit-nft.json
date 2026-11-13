@@ -1,0 +1,26 @@
+{
+  "createBuilding": "63PgidbkZ88nyZ3Goq4rkhHyBvx8ZadFX1fQhmb18wpo",
+  "createUnit": "2wR8XqnYvWX8z738DGiXfzFRGz4ohpTtYvvtRk1msZe4",
+  "useGlobalNft": "743oJp29tUGdEtd3MYDS8LdWKvsqpovJck7EurqVNQPB",
+  "init": "mLCrn62QsmJ4GAFd6tXdYLv1C4ZyBcE1CZmDPK4oS3K",
+  "mintTx": "8hZRSS2B2sVAQD2V1URXoCDgDinqjLvVg4rYvZt1ss6G",
+  "token": {
+    "token_id": "lease-4b-1",
+    "owner_id": "cf510089b0c4ef081d3516b1cd7b8ea4b4b54e241598c62c86c110de3dc31926",
+    "metadata": {
+      "title": "Lease, unit 4B (demo)",
+      "description": "Demo lease record. The caution deposit sits in the keyless vault named in extra.",
+      "media": null,
+      "media_hash": null,
+      "copies": null,
+      "issued_at": null,
+      "expires_at": null,
+      "starts_at": null,
+      "updated_at": null,
+      "extra": "{\"vault\":\"0sbe62faf670eea0865bcc7cdb7536c1b670dc81d4\",\"vaultCodeHash\":\"2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM\",\"termsHash\":\"\"}",
+      "reference": null,
+      "reference_hash": null
+    },
+    "approved_account_ids": {}
+  }
+}
