@@ -10,3 +10,4 @@ secrets/
 build/*.wat
 build/state.json
 build/tenancy_vault.wasm
+.codex-pass.md
