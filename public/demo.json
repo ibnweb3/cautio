@@ -1,0 +1,25 @@
+{
+  "note": "Throwaway testnet keys for demo mode. Public on purpose. Never hold real funds.",
+  "accounts": {
+    "landlord": {
+      "id": "845166dd4330adb65e8a1a65606da1971539d91eef1a5335a8f1a240f2951449",
+      "secret": "ed25519:27DzD2c2azunTdRJZDQNMKADRCnXxNKD8jsArFdbykRXf6GHsjB8zKwDEsrScsvrpAey93Vw8iyN59PrBKRY6vWC"
+    },
+    "tenant": {
+      "id": "ea02aa45924655d12408d0249eed337a8847f4e45bdc3caa70bf171d9aa7341c",
+      "secret": "ed25519:PiZPq1EaUz7XxhGDnTuK1qqd34SmSbezshWZcig8PniYo2VzMLCWUjkfXxqdxQ6wsjQdrSEfMCjoXA64bQkD4My"
+    },
+    "arbiter1": {
+      "id": "076ddbda2eb923085fc9bf4dc95d656332421cc0a59532c703bd75810c0e9431",
+      "secret": "ed25519:5cLNoCaj2Pn5Wj1LwJtexCbq9XWn5DYimzKvig4KoZGNi3j3vXoLg2P7VFydECt9g1GTjhP6gRSwWkqPaQrq9nfa"
+    },
+    "arbiter2": {
+      "id": "04edf54161d3138066d836e124ce2bed5fe6c573573affe70a5c448e2c03fa8b",
+      "secret": "ed25519:4VesDcttX8Fo19nGXRoURQNyBTL9KJP9pdgnPSsS43dsYGRcc1uk3GTQi5ftGcwjomTKhmGrj59yHTongKRyCGdG"
+    },
+    "recovery": {
+      "id": "b4262e27cef0816e81ab6dc87b8028d9e2b77cb74823d11bbdda01901a6e7555",
+      "secret": "ed25519:4L49ZnSkCs4CV67UtFRTzcVUxPyvx8nxaqfoq5Ywn2egZC4cmTneg6iHvYHv71FmaCRdjpPfb3JB8F6YoMQCtMVe"
+    }
+  }
+}
