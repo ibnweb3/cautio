@@ -1,4 +1,4 @@
-import { SimVault, PHASE, DAY } from "./sim.js";
+import { SimVault, PHASE, DAY, parseNear } from "./sim.js";
 
 const $ = (s) => document.querySelector(s);
 const milli = (x) => (Number(x) / 1000).toFixed(3) + " NEAR";
@@ -9,14 +9,17 @@ const el = (tag, props = {}, ...kids) => {
   return e;
 };
 
+let cfg = { rpc: "https://test.rpc.fastnear.com", pinnedCodeHash: "", vault: null };
 // ---------- tabs ----------
 const tabs = ["sim", "ver", "how"];
+let verifyAuto = false;
 function showTab(id) {
   for (const t of tabs) {
     $("#tab-" + t).setAttribute("aria-selected", String(t === id));
     $("#panel-" + t).hidden = t !== id;
   }
   try { sessionStorage.setItem("tab", id); } catch {}
+  if (id === "ver" && !verifyAuto && cfg.vault) { verifyAuto = true; $("#verify-form").requestSubmit(); }
 }
 for (const t of tabs) $("#tab-" + t).addEventListener("click", () => showTab(t));
 try { const s = sessionStorage.getItem("tab"); if (tabs.includes(s)) showTab(s); } catch {}
@@ -29,7 +32,7 @@ function field(label, name, type, value, extra = {}) {
   const id = "f-" + name + "-" + Math.random().toString(36).slice(2, 6);
   const input = type === "select"
     ? el("select", { id, name }, ...extra.options.map((o) => el("option", { value: o, textContent: o })))
-    : el("input", { id, name, type, value, min: "0", step: "1", inputMode: "numeric", required: true, autocomplete: "off" });
+    : el("input", { id, name, type, value, min: "0", step: "1", inputMode: "decimal", required: true, autocomplete: "off" });
   return el("div", { className: "f" }, el("label", { htmlFor: id, textContent: label }), input);
 }
 function action(title, hint, fields, run, primary = true) {
@@ -48,13 +51,13 @@ function action(title, hint, fields, run, primary = true) {
   wrap.append(form);
   return wrap;
 }
-const big = (s) => { if (!/^\d+$/.test(String(s).trim())) throw new Error("Enter a whole number in thousandths of a NEAR."); return BigInt(s); };
+const big = parseNear;
 
 function renderActions() {
   const box = $("#actions"); box.replaceChildren();
   const v = vault;
   if (role === "anyone") {
-    box.append(action("Pay deposit", "Anyone can pay the deposit in, up to the cap. Amounts are thousandths of a NEAR (1000 = 1 NEAR).", [field("Amount", "amt", "text", "1000")], (d) => v.fund(big(d.amt))));
+    box.append(action("Pay deposit", "Anyone can pay the deposit in, up to the cap (1 NEAR in this demo). Amounts are in NEAR.", [field("Amount (NEAR)", "amt", "text", "1")], (d) => v.fund(big(d.amt))));
     box.append(action("Trigger refund", "After the window closes with no claim, anyone can send the deposit back to the tenant.", [], () => v.release(), false));
   }
   if (role === "tenant") {
@@ -62,12 +65,12 @@ function renderActions() {
     box.append(action("Accept claim", "Pay the claimed amount to the landlord and close.", [], () => v.acceptClaim("tenant"), false));
   }
   if (role === "landlord") {
-    box.append(action("File claim", "One claim, inside the window, up to the held amount. Only that amount is locked; the rest goes back to the tenant at once.", [field("Amount", "amt", "text", "300"), field("Kind", "kind", "select", "", { options: ["damage", "service charge"] })], (d) => v.fileClaim("landlord", big(d.amt), d.kind)));
+    box.append(action("File claim", "One claim, inside the window, up to the held amount. Only that amount is locked; the rest goes back to the tenant at once.", [field("Amount (NEAR)", "amt", "text", "0.3"), field("Kind", "kind", "select", "", { options: ["damage", "service charge"] })], (d) => v.fileClaim("landlord", big(d.amt), d.kind)));
     box.append(action("Withdraw claim", "Drop the claim; the locked amount goes to the tenant.", [], () => v.withdrawClaim("landlord"), false));
   }
   if (role === "arbiter1" || role === "arbiter2") {
-    const cap = v.phase === 2 ? `Fee cap right now: ${v.feeCap()} (5% of the locked amount).` : "No claim to rule on yet.";
-    box.append(action("Rule", `Split the locked amount. The rest goes to the tenant. ${cap} Arbiter 2 can only act 5 days after the claim.`, [field("To landlord", "l", "text", "150"), field("Arbiter fee", "fee", "text", "10")], (d) => v.rule(role, big(d.l), big(d.fee))));
+    const cap = v.phase === 2 ? `Fee cap right now: ${(Number(v.feeCap()) / 1000).toFixed(3)} NEAR (5% of the locked amount).` : "No claim to rule on yet.";
+    box.append(action("Rule", `Split the locked amount. The rest goes to the tenant. ${cap} Arbiter 2 can only act 5 days after the claim.`, [field("To landlord (NEAR)", "l", "text", "0.15"), field("Arbiter fee (NEAR)", "fee", "text", "0.01")], (d) => v.rule(role, big(d.l), big(d.fee))));
   }
 }
 
@@ -101,10 +104,10 @@ const b58 = (bytes) => {
   for (const b of bytes) { if (b === 0) s = "1" + s; else break; }
   return s;
 };
-let cfg = { rpc: "https://rpc.testnet.near.org", pinnedCodeHash: "", vault: null };
+
 fetch("config.json").then((r) => r.json()).then((c) => {
   cfg = c;
-  if (c.vault) { $("#vault-id").value = c.vault; $("#ver-hint").textContent = "Demo vault pre-filled from config."; }
+  if (c.vault) { $("#vault-id").value = c.vault; $("#ver-hint").textContent = "A vault that has already run a full claim and arbiter ruling on testnet. Paste any other vault account to check it."; if (!$("#panel-ver").hidden) { verifyAuto = true; $("#verify-form").requestSubmit(); } }
   else $("#ver-hint").textContent = "No demo vault is configured in this build yet.";
 }).catch(() => { $("#ver-hint").textContent = "Could not load config.json."; });
 

@@ -3,6 +3,14 @@
 export const OPEN = 0, HANDED_OVER = 1, CLAIMED = 2, SETTLED = 3;
 export const PHASE = ["Open: accepting deposit", "Handed over: claim window running", "Claimed: amount locked", "Settled"];
 export const DAY = 86_400;
+export const fmt = (x) => (Number(x) / 1000).toFixed(3) + " NEAR";
+/** Parse a decimal NEAR amount like "0.25" into thousandths (BigInt). Throws on bad input. */
+export function parseNear(str) {
+  const t = String(str).trim();
+  if (!/^\d+(\.\d{1,3})?$/.test(t)) throw new Error("Enter an amount in NEAR with up to 3 decimals, for example 0.25.");
+  const [w, f = ""] = t.split(".");
+  return BigInt(w) * 1000n + BigInt(f.padEnd(3, "0"));
+}
 
 export class SimVault {
   constructor(t) {
@@ -17,7 +25,7 @@ export class SimVault {
     this._req(this.phase === OPEN, "Deposit is closed.");
     this._req(amt > 0n, "Enter an amount above zero.");
     this._req(this.held + amt <= this.t.cap, "Over the deposit cap.");
-    this.held += amt; this._say(`Deposit paid in: ${amt} (held ${this.held}).`);
+    this.held += amt; this._say(`Deposit paid in: ${fmt(amt)} (held ${fmt(this.held)}).`);
   }
   declareHandover(who) {
     this._req(this.phase === OPEN, "Wrong phase.");
@@ -33,7 +41,7 @@ export class SimVault {
     const back = this.held - amt;
     this.claim = { amt, kind, at: this.now }; this.held = amt; this.phase = CLAIMED;
     this.paid.tenant += back;
-    this._say(`Landlord claimed ${amt} (${kind}). Undisputed ${back} refunded to tenant now.`);
+    this._say(`Landlord claimed ${fmt(amt)} (${kind}). Undisputed ${fmt(back)} refunded to the tenant now.`);
   }
   _settle(landlordAmt, fee, arbiter) {
     const total = this.held; const tenantAmt = total - landlordAmt - fee;
@@ -41,7 +49,7 @@ export class SimVault {
     this._req(landlordAmt + fee + tenantAmt === total, "Conservation broken.");
     this.paid.landlord += landlordAmt; this.paid.tenant += tenantAmt; if (arbiter) this.paid.arbiter += fee;
     this.held = 0n; this.phase = SETTLED;
-    this._say(`Settled: landlord ${landlordAmt}, tenant ${tenantAmt}, arbiter fee ${fee}.`);
+    this._say(`Settled: landlord ${fmt(landlordAmt)}, tenant ${fmt(tenantAmt)}, arbiter fee ${fmt(fee)}.`);
   }
   acceptClaim(who) {
     this._req(this.phase === CLAIMED, "There is no claim.");

@@ -100,6 +100,13 @@
       <li>No claim: anyone can trigger the refund to the tenant. Claim: only the claimed amount stays locked and the rest goes back to the tenant at once.</li>
       <li>An arbiter named in the lease splits the locked amount. A second arbiter can step in if the first stays silent. Payouts always sum to exactly the amount held.</li>
     </ol>
+    <h2>Why NEAR, honestly</h2>
+    <p>Refund-by-default escrow can be written on other chains, and other projects have. What NEAR adds here:</p>
+    <ul>
+      <li><strong>Keyless is a checkable property.</strong> The vault is a deterministic account created from a code hash and its terms. Anyone can confirm with one RPC call that it has zero keys and which code it runs.</li>
+      <li><strong>One published copy of the code.</strong> Each vault only references the global contract by hash, so creating a vault is cheap after the one-time publish.</li>
+      <li><strong>Named nested accounts</strong> fit buildings and units: <code>unit-4b.building.testnet</code>.</li>
+    </ul>
     <h2>What this does not do</h2>
     <ul>
       <li>It does not replace a court. It is a private contract between the parties. We have not checked how Nigerian courts would treat it.</li>

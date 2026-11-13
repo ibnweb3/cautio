@@ -41,6 +41,15 @@ See [`evidence/EVIDENCE.md`](evidence/EVIDENCE.md) for what was checked and what
 - **Nested named accounts**: a building is a root account and each unit is a sub-account.
 - **NEP-171**: the unit sub-account runs a standard NFT contract (the testnet `nft.globals.primitives.testnet` code, referenced by its hash) and holds the lease NFT.
 
+## Why NEAR, honestly
+
+Refund-by-default escrow can be written on other chains, and the projects above did. We do not claim NEAR is the only place this could run. What NEAR adds:
+
+- **Keyless is a checkable property.** The vault is a deterministic account created from a code hash plus its terms. One RPC call shows it has zero keys and which code it runs.
+- **One published copy of the code.** Each vault references the global contract by hash, so a new vault is cheap after the one-time publish (12.84 testnet NEAR for our 128 KB wasm).
+- **Named nested accounts** fit buildings and units: `unit-4b.<building>`.
+- **Intents pay-in** (not built) is where NEAR's cross-chain feature would matter most.
+
 ## Other on-chain rental-deposit projects, and what is different
 
 Found by web search on 2026-11-12 from their own pages and papers; we have not tested them: **Trustless Work** (Stellar, used by the SafeTrust co-living platform), **Rentible** (Solidity, test deployment), **RxEAL** (Ethereum), **DeWork** (ETHGlobal Taipei prototype), **zk-Agreements** (arXiv). As far as we saw, they settle by mutual sign-off or an oracle or approver.

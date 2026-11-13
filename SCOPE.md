@@ -1,5 +1,7 @@
 # TenancyVault: scope
 
+> Status at 2026-11-13: the plan below was followed except the Intents stub page (not built) and the on-chain runs of arbiter 2 and the recovery flow (unit tests only). See README and evidence/EVIDENCE.md for what actually ran.
+
 Tracks: NFTs That Do Something + Real-World Money. Testnet only. Dev ends 2026-11-14 23:59 UTC.
 
 ## One line

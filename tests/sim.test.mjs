@@ -40,3 +40,12 @@ test("split cannot exceed locked", () => {
 test("cap enforced", () => {
   const v = new SimVault({}); assert.throws(() => v.fund(1001n), /cap/);
 });
+import { parseNear } from "../public/sim.js";
+test("parseNear handles decimals and rejects junk", () => {
+  assert.equal(parseNear("1"), 1000n);
+  assert.equal(parseNear("0.25"), 250n);
+  assert.equal(parseNear("0.003"), 3n);
+  assert.throws(() => parseNear("0.0001"));
+  assert.throws(() => parseNear("-1"));
+  assert.throws(() => parseNear("abc"));
+});
