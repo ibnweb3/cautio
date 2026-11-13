@@ -1,0 +1,23 @@
+// Finishes a vault that has a claim: arbiter 1 rules. Appends to evidence/<label>-run.json.
+import { readFileSync, writeFileSync } from "node:fs";
+import { provider, loadKey, accountFrom, balance } from "./lib/chain.mjs";
+const label = process.argv[2];
+const V = JSON.parse(readFileSync("evidence/vaults.json", "utf8"))[label].account;
+const roles = loadKey("roles");
+const file = `evidence/${label}-run.json`;
+const rec = JSON.parse(readFileSync(file, "utf8"));
+const st = async () => JSON.parse(Buffer.from((await provider.query({ request_type: "call_function", finality: "final", account_id: V, method_name: "get_state", args_base64: Buffer.from("{}").toString("base64") })).result).toString());
+const bals = async () => { const o = {}; for (const k of Object.keys(roles)) o[k] = await balance(roles[k].id); o.vault = await balance(V); return o; };
+const pre = await bals();
+const a1 = accountFrom(roles.arbiter1.id, roles.arbiter1.secret);
+const r = await a1.callFunctionRaw({ contractId: V, methodName: "rule", args: { landlord_amount: "100000000000000000000000", arbiter_fee: "5000000000000000000000" }, gas: 40_000_000_000_000n });
+const logs = (r.receipts_outcome || []).flatMap((o) => o.outcome.logs).filter((l) => l.startsWith("EVENT"));
+await new Promise((x) => setTimeout(x, 4000));
+const after = await st(); const post = await bals();
+rec.steps = rec.steps.filter((s) => s.name !== "arbiter1.rule");
+rec.steps.push({ name: "arbiter1.rule (40 TGas rerun: first try ran out of the 15 TGas prepaid)", ok: true, tx: r.transaction.hash, logs, phaseAfter: after.phase, heldAfter: after.held });
+rec.stateFinal = after; rec.balancesBeforeRule = pre; rec.balancesAfter = post;
+const dlt = (k) => BigInt(post[k]) - BigInt(pre[k]);
+rec.ruleDeltas_yocto = { landlord: dlt("landlord").toString(), tenant: dlt("tenant").toString(), arbiter1_net_of_gas: dlt("arbiter1").toString(), vault: dlt("vault").toString() };
+writeFileSync(file, JSON.stringify(rec, null, 2));
+console.log(logs, "phase", after.phase, "held", after.held, JSON.stringify(rec.ruleDeltas_yocto));

@@ -1,6 +1,6 @@
 {
   "network": "testnet",
-  "rpc": "https://rpc.testnet.near.org",
+  "rpc": "https://test.rpc.fastnear.com",
   "pinnedCodeHash": "2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM",
-  "vault": null
+  "vault": "0sbe62faf670eea0865bcc7cdb7536c1b670dc81d4"
 }

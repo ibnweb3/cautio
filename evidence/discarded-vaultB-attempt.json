@@ -1,0 +1,140 @@
+{
+  "vault": "0s14f17e445b6526dbc728cdc6225a035d6742a3b9",
+  "steps": [
+    {
+      "name": "buffer: 0.01 NEAR plain transfer to vault",
+      "ok": true,
+      "tx": "ADqMP7QUNe5a9gjKqHmBte15sL2D1nCLe21Q5jx8ZzRA"
+    },
+    {
+      "name": "attempt: landlord's key signs a transfer FROM the vault",
+      "ok": false,
+      "error": "Access key ed25519:DSUsqYJgeMiLzwwd3iXML2w6oPozoPnk5X172YB4UdSP does not exist at block height 277435955"
+    },
+    {
+      "name": "attempt: tenant's key signs a transfer FROM the vault",
+      "ok": false,
+      "error": "Access key ed25519:ExH2s18n9dCbwNqrhruuhxE5myrkaiqKExeikTuRFkDs does not exist at block height 277435956"
+    },
+    {
+      "name": "landlord.declare_handover",
+      "ok": false,
+      "error": "WebAssembly trap: An `unreachable` opcode was executed."
+    },
+    {
+      "name": "tenant.fund",
+      "ok": true,
+      "tx": "7jXayBXQt5sAaAwBHWy1GhmNKRdQY57dEK39VMqjbUa9",
+      "logs": [
+        "EVENT funded amount=400000000000000000000000 held=400000000000000000000000"
+      ]
+    },
+    {
+      "name": "landlord.release",
+      "ok": false,
+      "error": "WebAssembly trap: An `unreachable` opcode was executed."
+    },
+    {
+      "name": "tenant.declare_handover",
+      "ok": true,
+      "tx": "Gr253XguaRUhj6okcYCWjDa5yYi21cCLdcS5eYhx6V2Q",
+      "logs": [
+        "EVENT handover at=1794529194583980904"
+      ]
+    },
+    {
+      "name": "landlord.release",
+      "ok": false,
+      "error": "WebAssembly trap: An `unreachable` opcode was executed."
+    },
+    {
+      "name": "landlord.file_claim",
+      "ok": false,
+      "error": "Not enough balance for b8d3488ce7a635cc4fc72b9a848486ba7960b90feb272a284c2f75d1853b9ab8 (balance: 22787333240280200000000, cost: 25919825039853500000000)"
+    },
+    {
+      "name": "arbiter2.rule",
+      "ok": false,
+      "error": "WebAssembly trap: An `unreachable` opcode was executed."
+    },
+    {
+      "name": "arbiter1.rule",
+      "ok": false,
+      "error": "WebAssembly trap: An `unreachable` opcode was executed."
+    }
+  ],
+  "balancesBefore": {
+    "landlord": "48998170642373200000000",
+    "tenant": "599672079927903600000000",
+    "recovery": "10000000000000000000000",
+    "arbiter1": "50000000000000000000000",
+    "arbiter2": "50000000000000000000000",
+    "vault": "11000000000000000000000"
+  },
+  "balancesAfterClaim": {
+    "landlord": "22787333240280200000000",
+    "tenant": "199344159855807200000000",
+    "recovery": "10000000000000000000000",
+    "arbiter1": "50000000000000000000000",
+    "arbiter2": "50000000000000000000000",
+    "vault": "411000000000000000000000"
+  },
+  "stateAfterClaim": {
+    "landlord": "b8d3488ce7a635cc4fc72b9a848486ba7960b90feb272a284c2f75d1853b9ab8",
+    "tenant": "cf510089b0c4ef081d3516b1cd7b8ea4b4b54e241598c62c86c110de3dc31926",
+    "recovery": "9898a8635f631a0142e0cd721bd335d9b2ac5fc7bc53e8e73b83032529b0aca1",
+    "arbiter1": "e8cce47885d25da513414b8c3e90686868d9ea7d86032ff1f2599a4d05a0d350",
+    "arbiter2": "79279a41c4e2e9976327e6ebcaf6069dce600552a025f9bf0025ee4d93bc3e10",
+    "cap": "500000000000000000000000",
+    "claim_window_ns": "120000000000",
+    "arbiter_sla_ns": "90000000000",
+    "recovery_timelock_ns": "120000000000",
+    "arbiter_fee_bps": 500,
+    "terms_hash": "f6fb9fb04f2bd1049706e1825404f12ddcd297a16c4c1158a932f090d7056000",
+    "phase": 1,
+    "held": "400000000000000000000000",
+    "handover_at": "1794529194583980904",
+    "claim_amount": "0",
+    "claim_kind": 0,
+    "claim_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "claim_at": "0",
+    "recovery_at": "0",
+    "redirected": false
+  },
+  "stateFinal": {
+    "landlord": "b8d3488ce7a635cc4fc72b9a848486ba7960b90feb272a284c2f75d1853b9ab8",
+    "tenant": "cf510089b0c4ef081d3516b1cd7b8ea4b4b54e241598c62c86c110de3dc31926",
+    "recovery": "9898a8635f631a0142e0cd721bd335d9b2ac5fc7bc53e8e73b83032529b0aca1",
+    "arbiter1": "e8cce47885d25da513414b8c3e90686868d9ea7d86032ff1f2599a4d05a0d350",
+    "arbiter2": "79279a41c4e2e9976327e6ebcaf6069dce600552a025f9bf0025ee4d93bc3e10",
+    "cap": "500000000000000000000000",
+    "claim_window_ns": "120000000000",
+    "arbiter_sla_ns": "90000000000",
+    "recovery_timelock_ns": "120000000000",
+    "arbiter_fee_bps": 500,
+    "terms_hash": "f6fb9fb04f2bd1049706e1825404f12ddcd297a16c4c1158a932f090d7056000",
+    "phase": 1,
+    "held": "400000000000000000000000",
+    "handover_at": "1794529194583980904",
+    "claim_amount": "0",
+    "claim_kind": 0,
+    "claim_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "claim_at": "0",
+    "recovery_at": "0",
+    "redirected": false
+  },
+  "balancesAfter": {
+    "landlord": "48561009585040000000000",
+    "tenant": "199344159855807200000000",
+    "recovery": "10000000000000000000000",
+    "arbiter1": "24080511166810500000000",
+    "arbiter2": "49853075638735400000000",
+    "vault": "411000000000000000000000"
+  },
+  "netChange": {
+    "landlord": "0.000437 (out)",
+    "tenant": "0.400327 (out)",
+    "arbiter1": "0.025919 (out)",
+    "vault": "0.400000 (in)"
+  }
+}

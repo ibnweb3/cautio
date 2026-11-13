@@ -1,0 +1,36 @@
+{
+  "vaultA": {
+    "account": "0s297fb7bcf0e33968377ebbb93e12bb799f444c1d",
+    "codeHash": "2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM",
+    "termsHash": "20a9a9011a5f3fc1ad097def95a686c079866949aa57abdb53f09b7a7153d368",
+    "salt": "demo-A",
+    "createTx": "5p5Y1FS14Fs69mwq69B5otZoiX1UWTjRbPWtkUL8CGPd"
+  },
+  "vaultB": {
+    "account": "0s14f17e445b6526dbc728cdc6225a035d6742a3b9",
+    "codeHash": "2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM",
+    "termsHash": "f6fb9fb04f2bd1049706e1825404f12ddcd297a16c4c1158a932f090d7056000",
+    "salt": "demo-B",
+    "createTx": "6KjwnXnBTva7ruEJgQtC1r6UpiiyDJkBXu42C1r3o5yA",
+    "preSendTx": "C7W9cvbyXXk1d5PUqV7Zdn2nMJTRhrPwjF6JRoxd1dHp",
+    "afterPreSend": {
+      "error": "Account 0s14f17e445b6526dbc728cdc6225a035d6742a3b9 does not exist at block height 277435914"
+    },
+    "afterCreate": {
+      "amount": "1000000000000000000000",
+      "block_hash": "B9xerpij1Jvo7P1xkDUkfvRbtV5TRgAwt28ZEFUAu5z",
+      "block_height": 277435919,
+      "code_hash": "11111111111111111111111111111111",
+      "locked": "0",
+      "storage_paid_at": 0,
+      "storage_usage": 100
+    }
+  },
+  "vaultC": {
+    "account": "0sbe62faf670eea0865bcc7cdb7536c1b670dc81d4",
+    "codeHash": "2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM",
+    "salt": "demo-C",
+    "createTx": "55JuWKGxQNg2fgqPRkSpFX4smtTj9cRTDere5apMLqRg",
+    "claimWindowSeconds": 300
+  }
+}
