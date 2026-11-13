@@ -29,7 +29,7 @@ Today the landlord holds the caution deposit. Getting it back after move-out is 
 | `npm test` | 8 simulator tests pass |
 | `cd contract && cargo test` (needs Rust) | 20 contract tests pass |
 | Open the site (or `python -m http.server -d public` and open the page), tab **Walk-through**: pay deposit as Anyone, declare handover as Tenant, file a 300 claim as Landlord, rule as Arbiter 1 | log shows every step; payouts add up to the amount held |
-| Tab **Verify on testnet** and press Check | live RPC checks: no access keys, code referenced by hash and re-hashed in your browser, `get_state`, and the lease NFT |
+| Tab **Verify live** and press Check | live RPC checks: no access keys, code referenced by hash and re-hashed in your browser, `get_state`, and the lease NFT |
 | Read [`evidence/EVIDENCE.md`](evidence/EVIDENCE.md) | transaction links for the live runs |
 
 The Walk-through tab is a **simulation** of the same rules in your browser (fake money). The Verify tab is **live testnet**.
@@ -108,3 +108,5 @@ Built with Claude Code (Claude Sonnet 5.5) working with the human author. The AI
 ## Licence
 
 MIT, see [LICENSE](LICENSE).
+
+Background photo: "Ikoyi, Lagos, Nigeria" by Reginald Bassey, [CC BY-SA 4.0](https://commons.wikimedia.org/wiki/File:Ikoyi,_Lagos,_Nigeria.jpg), resized, in `public/lagos.jpg`. The page layout borrows the calm full-image-and-floating-cards approach of Econia (econia-production.up.railway.app); no code or assets were copied.
