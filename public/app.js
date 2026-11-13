@@ -56,6 +56,8 @@ const ACCOUNT_RE = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
 const validAccount = (s) => s.length >= 2 && s.length <= 64 && ACCOUNT_RE.test(s);
 function friendly(e) {
   const m = String(e && e.message || e);
+  const pm = /panicked: ([^"\\]+)/.exec(m) || /panicked: ([^"\\]+)/.exec(JSON.stringify(e && e.transactionResult && e.transactionResult.status || ""));
+  if (pm) { const t = pm[1].trim(); return "The vault rejected this: " + t.charAt(0).toUpperCase() + t.slice(1) + "."; }
   if (/unreachable|ExecutionError|FunctionCallError/i.test(m)) return "The vault rejected this call. Usually the wrong account, the wrong phase, or an amount over a limit.";
   if (/NotEnoughBalance|Not enough balance|lacks balance|LackBalance/i.test(m)) return "This account does not have enough NEAR for the amount plus the network fee (a few hundredths of a NEAR are reserved for gas). Lower the amount or top up in the Account tab.";
   if (/GasLimit|Exceeded the prepaid gas/i.test(m)) return "Ran out of gas for this call.";

@@ -37,7 +37,8 @@ console.log("status:", JSON.stringify(r.status).slice(0, 80), "tx:", r.transacti
 const file = "evidence/vaults.json";
 const all = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
 all[label] = { account: id, codeHash: hash, termsHash: terms.termsHashHex, salt, createTx: r.transaction.hash, ...obs };
-obs.afterCreate = await provider.query({ request_type: "view_account", finality: "final", account_id: id });
+await new Promise((r) => setTimeout(r, 4000));
+obs.afterCreate = await provider.query({ request_type: "view_account", finality: "optimistic", account_id: id });
 all[label].afterCreate = obs.afterCreate;
 writeFileSync(file, JSON.stringify(all, null, 2));
 console.log("after create:", JSON.stringify(obs.afterCreate).slice(0, 300));

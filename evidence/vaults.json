@@ -32,5 +32,39 @@
     "salt": "demo-C",
     "createTx": "55JuWKGxQNg2fgqPRkSpFX4smtTj9cRTDere5apMLqRg",
     "claimWindowSeconds": 300
+  },
+  "vaultE": {
+    "account": "0s15e71f302e8c77306da19a1bce45053a0777e652",
+    "codeHash": "7sPm7Ernye7aJp3DnHeUQAzzPGKD1YCZrdfLHF6N43vZ",
+    "termsHash": "970cbd911222b1d6b36b4614712c2c38f32268eb671b930cf3e96c42c5ac3cfb",
+    "salt": "emwfa3t5v",
+    "createTx": "4Ts9yQZCsMajWqT6uT7U8nKyNkE3onb6nuo9oEViq92K",
+    "afterCreate": {
+      "amount": "0",
+      "block_hash": "DpZZxPQPdkuEfF82fiYXprPPFsdLX1VNN7tsuM2NzmLH",
+      "block_height": 277543881,
+      "code_hash": "11111111111111111111111111111111",
+      "global_contract_hash": "7sPm7Ernye7aJp3DnHeUQAzzPGKD1YCZrdfLHF6N43vZ",
+      "locked": "0",
+      "storage_paid_at": 0,
+      "storage_usage": 682
+    }
+  },
+  "vaultF": {
+    "account": "0s43fef4fb2d0a05106f42c5dbe8cfd980ee9a5db3",
+    "codeHash": "7sPm7Ernye7aJp3DnHeUQAzzPGKD1YCZrdfLHF6N43vZ",
+    "termsHash": "e3daf6831835d6e1a91c4379d31dc41329c7eea50893196f39eef03af6d9be0f",
+    "salt": "fmwfa3t5v",
+    "createTx": "9VhgKb5Xrrw1jiSVczLPXQiwKvTRCo4pNph4kTgEy2Bt",
+    "afterCreate": {
+      "amount": "0",
+      "block_hash": "GZYtuzNitaggaLN1WDcW1mTBcimKZWg6BGDus4vjPNZ5",
+      "block_height": 277544079,
+      "code_hash": "11111111111111111111111111111111",
+      "global_contract_hash": "7sPm7Ernye7aJp3DnHeUQAzzPGKD1YCZrdfLHF6N43vZ",
+      "locked": "0",
+      "storage_paid_at": 0,
+      "storage_usage": 682
+    }
   }
 }

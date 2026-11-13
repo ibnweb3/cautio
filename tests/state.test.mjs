@@ -22,10 +22,10 @@ test("browser sha256 matches Node sha256", async () => {
 test("published code hash matches the pinned hash", async () => {
   const wasm = readFileSync(new URL("../build/opt.wasm", import.meta.url));
   assert.equal(b58(await sha256(new Uint8Array(wasm))), globalHash(wasm));
-  assert.equal(globalHash(wasm), "2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM");
+  assert.equal(globalHash(wasm), JSON.parse(readFileSync("public/config.json", "utf8")).networks.testnet.pinnedCodeHash);
 });
 test("same vault address from Uint8Array and Buffer state", () => {
-  const hash = "2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM";
+  const hash = JSON.parse(readFileSync("public/config.json", "utf8")).networks.testnet.pinnedCodeHash;
   const a = new DeterministicStateInit({ code: { codeHash: hash }, data: [[Buffer.from("STATE"), nodeEncode(terms)]] }).deriveAccountId();
   const b = new DeterministicStateInit({ code: { codeHash: hash }, data: [[new TextEncoder().encode("STATE"), encodeState(terms)]] }).deriveAccountId();
   assert.equal(a, b);

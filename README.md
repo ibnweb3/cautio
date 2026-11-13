@@ -40,7 +40,7 @@ One account in the browser can hold one role at a time. To try all roles, open t
 
 ## What is live on testnet
 
-- Contract published as an immutable global contract. Code hash `2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM` (sha256 of [`build/opt.wasm`](build/opt.wasm)).
+- Contract published as an immutable global contract. Current code hash `7sPm7Ernye7aJp3DnHeUQAzzPGKD1YCZrdfLHF6N43vZ` (sha256 of [`build/opt.wasm`](build/opt.wasm), built with `--cfg near` so rejected calls show their real reason). The first build, `2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM`, is still published; vaults made with it keep working and the page marks them as an older build.
 - Three vaults created with `DeterministicStateInit` (keyless accounts whose address is derived from the code hash and the terms). Vault C, `0sbe62faf670eea0865bcc7cdb7536c1b670dc81d4`, ran the full claim and arbiter path. Vaults A and B ran the default-refund path.
 - Vault D, `0sc28f1987ea5e2ccfeace344ed95076ad2d46bdbd`, was created **from the web page** (the in-browser account was the landlord), then funded and given a claim from the page. See `evidence/browser-run.md`.
 - Building root account `derby-tv-bldg.testnet`, unit sub-account `unit-4b.derby-tv-bldg.testnet`, and a lease NFT (`lease-4b-1`) owned by the tenant. Its metadata names the vault and terms hash.
@@ -85,15 +85,22 @@ We did not build NEAR Intents pay-in (see below), so that part of the idea is no
 - **Landlords must opt in.** We have not verified that any would.
 - **Not a court.** This is a private contract between the parties. We have not checked how Nigerian courts would treat it, nor any tax or licensing duties that apply to holding or converting crypto in Nigeria. Get local legal advice before real use.
 - **Evidence hashes are not proof of truth.** A condition-report hash shows the document existed unchanged, not that it is accurate.
-- **Panic messages are generic.** Rejected calls show on chain as "WebAssembly trap: unreachable", not a readable reason, because the wasm was built without the `--cfg near` flag. Rejections still fail correctly. Fixing it changes the code hash and needs a re-publish (about 13 testnet NEAR).
+- **Older vaults show generic errors.** Vaults made with the first build (`2HRG5f…`) report rejected calls as "unreachable". Vaults made with the current build report the reason.
 - **Fixed address, no storage top-up.** A vault's balance must stay above NEAR's storage minimum. We send a small plain-NEAR buffer to each vault before use.
 - **Refund address must exist.** If the tenant's refund account does not exist, a payout transfer would fail and the money would stay in the vault. The refund address is fixed at creation.
 - **The lease NFT is a standard contract.** It points to the vault, but nothing on chain makes the vault check the NFT. Rental history "travelling with the tenant" is not built.
-- **Recovery address and arbiter 2** are covered by unit tests only, not run on chain.
+- **Recovery address and arbiter 2** were run on chain with the current build: see `evidence/live-e2.md`. The page's buttons for them were not clicked through live.
+
+## Also in the page
+
+- Wallet connection through `@hot-labs/near-connect` (Meteor, Intear, Nightly, Ledger and others). Pay-in, handover, claims, rulings and recovery are signed by the wallet. **Not tested with a real wallet.** Wallets cannot create the keyless vault yet (no state-init action), so opening a vault is signed by a small key kept in the browser; it only pays the fee.
+- Network settings in `public/config.json` (testnet and mainnet blocks). Mainnet has no published contract hash yet, so the page refuses to open vaults there.
+- Lease NFT issued from the page by a landlord with a named account (creates a keyless unit sub-account on the standard NFT code by hash, mints to the tenant). Run live: see `evidence/browser-run.md`.
+- Recovery start, cancel and complete buttons. Calendar (.ics) reminders for deadlines. A claim-evidence copy downloaded when a claim is filed.
 
 ## Not built
 
-A real wallet connection (the page signs with a testnet key it creates in your browser, which is not safe for real money), minting the lease NFT from the page (done by script for the example only), the recovery actions in the page (unit tests only), arbiter 2's ruling button (in the page but not run live), NEAR Intents pay-in from other chains (Intents has no testnet and we did not spend mainnet funds), naira or cNGN rails, passkey accounts, a bonded arbiter panel, unpaid-rent claims (dropped on purpose: a capped deposit cannot cover arrears, and a landlord-triggered rent claim could reward an illegal lockout), encrypted condition-report storage, lease renewal.
+NEAR Intents pay-in from other chains (Intents has no testnet and we did not spend mainnet funds), stablecoin or naira vaults (the vault holds NEAR, which moves in price), a hosted evidence store (you keep the files; only their hash is on chain), email or SMS alerts (only calendar files), an independent audit, a legal review, passkey accounts, a bonded arbiter panel, unpaid-rent claims (dropped on purpose: a capped deposit cannot cover arrears, and a landlord-triggered rent claim could reward an illegal lockout), lease renewal.
 
 ## Files
 
@@ -104,7 +111,7 @@ A real wallet connection (the page signs with a testnet key it creates in your b
 
 ## Rebuild the contract
 
-Rust nightly with `rust-src`, target `wasm32-unknown-unknown`, then `scripts/build.sh` (uses `-Z build-std` and `target-cpu=mvp` so the wasm uses only features NEAR accepts), then `wasm-opt --mvp-features -Oz`. On 2026-11-13 a fresh rebuild with these steps (Rust 1.100 nightly, binaryen 125) reproduced the published hash `2HRG5f…` exactly. A different toolchain will likely give a different hash.
+Rust nightly with `rust-src`, target `wasm32-unknown-unknown`, then `scripts/build.sh` in Linux or WSL (it uses `--cfg near`, `-Z build-std` and `target-cpu=mvp` so the wasm uses only features NEAR accepts, then runs `wasm-opt --mvp-features -Oz`). The published `7sPm7E…` build used rustc 1.102.0-nightly (2026-11-11) and binaryen 132. A different toolchain will likely give a different hash, so before trusting a published hash, rebuild with the versions above and compare. The first build (`2HRG5f…`) used Rust 1.100 nightly and binaryen 125 and reproduced exactly then.
 
 ## AI disclosure
 

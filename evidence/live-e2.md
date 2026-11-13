@@ -1,0 +1,21 @@
+# Live run: arbiter 2 and recovery paths
+
+- vault E 0s15e71f302e8c77306da19a1bce45053a0777e652
+- fund ok HDVv1JYigv1RHhuQQrBXpK2FMqeB7LKJVnmLsvcYpW5Q
+- declare_handover ok 8c1PPv3LPfuwd8Nprc6seArndST8hLVExj7gccDDpvnw
+- file_claim ok CqrL5aPkYjd9xStqeyapGnPLp6CGrjvcmz6JsvaGb1dW
+- arbiter 2 too early (expect rejection with a readable reason) REJECTED: {"Failure":{"ActionError":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: not the arbiter on duty"}}}}}
+- waiting 95 s for the arbiter wait to pass
+- arbiter 2 rule ok 9Y8EynizXBxSES7BAMGN1aACo2Vurs8FQyaueAX1j12E
+- E final phase 3 held 0
+- vault F 0s43fef4fb2d0a05106f42c5dbe8cfd980ee9a5db3
+- fund ok 5orKQmUELMrj7hbh9xHXfrStJ7ehoBxZfiiNJCcnGc6
+- start_recovery by recovery ok 5eFJZ9kLx9ReNTLoMP62gL3FJr6qpaTmX5kwKKYoahi6
+- complete_recovery too early (expect rejection) REJECTED: {"Failure":{"ActionError":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: timelock not over"}}}}}
+- waiting 125 s for the recovery wait
+- complete_recovery ok 4LvcsD8HN8YQ8Phk1ak7kHdFQ6VP4WaQtqxQo4JdvqmT
+- F redirected true
+- declare_handover (now by the recovery account) ok 4THyBtszA1TbqsGC6X9TJ9RzbenwSs1JYJs8KPeEmhzU
+- waiting 65 s for the claim window
+- release ok A54GizYDygyXwSBDVxGKSPC7MgCD8gCL3BNcgnVFxRng
+- F final phase 3 held 0 recovery account gained (yocto) 100000000000000000000000
