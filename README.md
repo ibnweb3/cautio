@@ -4,7 +4,13 @@ A rental caution deposit that nobody can move by hand. It sits in a NEAR account
 
 Built for NEAR HACKATHON. (Renamed from "TenancyVault" before submission. The on-chain accounts, vaults and published code predate the rename and keep their addresses; the Rust crate in `contract/` is still called `tenancy-vault`.) Tracks: NFTs That Do Something, Real-World Money. **Testnet only.**
 
-Live demo: https://cautio.derbylabs.workers.dev (testnet).
+Live demo: https://cautio.ibnweb3lab.workers.dev (testnet).
+
+## Second entry by the same author
+
+NEAR HACKATHON allows one person two independent, disclosed projects. This is one; the other is **WellKeep**, a keyless repair fund for community water points: https://github.com/ibnweb3/wellkeep. It is a separate repository with its own contract and deployment.
+
+Commits dated up to 2026-11-13 are authored by the GitHub account `0xderby`, a second account of the same author, because this project was started under it. The repository was then moved here and the old copy made private.
 
 ## The problem in 30 seconds
 
