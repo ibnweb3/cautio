@@ -92,6 +92,7 @@ function newAccount() {
 }
 async function refreshAccount() {
   $("#wallet-none").hidden = !!wallet; $("#wallet-have").hidden = !wallet;
+  const nw = $("#nav-wallet"); nw.textContent = wallet ? (wallet.id.length > 16 ? wallet.id.slice(0, 14) + "…" : wallet.id) : "Connect wallet"; nw.classList.toggle("on", !!wallet); nw.title = wallet ? "Connected: " + wallet.id + ". Click to open Account." : "";
   $("#acting-row").hidden = !(wallet && me);
   if (wallet) {
     $("#wallet-id").textContent = wallet.id;
@@ -576,6 +577,7 @@ $("#wallet-connect").addEventListener("click", async () => {
   if (!connector) return say($("#wallet-msg"), "Wallet support is not available in this browser.", true);
   try { await connector.connect(); } catch (x) { say($("#wallet-msg"), "Could not connect: " + String(x && x.message || x).slice(0, 160), true); }
 });
+$("#nav-wallet").addEventListener("click", () => { if (wallet) { $("#tab-account").click(); } else $("#wallet-connect").click(); });
 $("#wallet-disconnect").addEventListener("click", async () => { try { await connector.disconnect(); } catch {} setWallet(null); });
 $("#acting").addEventListener("change", (e) => { acting = e.target.value; renderActions(); });
 
