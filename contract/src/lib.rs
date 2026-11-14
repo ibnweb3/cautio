@@ -9,13 +9,13 @@
 //! `near-sdk` writes, so the same bytes can be produced off-chain for state-init
 //! (see scripts/state.mjs).
 //!
-//! Money rules (native NEAR in this build):
+//! Money rules (native NEAR, or any NEP-141 token such as a dollar stablecoin when `token` is set):
 //!   fund -> declare_handover (tenant) -> window -> release (default refund)
 //!                                      -> file_claim (landlord) -> accept / rule / withdraw
 //! Invariant: every payout of a settlement sums to exactly the amount held.
 use near_sdk::json_types::{U128, U64};
 use near_sdk::serde::Serialize;
-use near_sdk::{env, near, require, AccountId, NearToken, PanicOnDefault, Promise};
+use near_sdk::{env, near, require, AccountId, Gas, NearToken, PanicOnDefault, Promise};
 
 pub const OPEN: u8 = 0; // accepting deposit
 pub const HANDED_OVER: u8 = 1; // tenant declared handover, claim window running
@@ -40,6 +40,8 @@ pub struct Vault {
     pub recovery_timelock_ns: u64,
     pub arbiter_fee_bps: u16,
     pub terms_hash: [u8; 32],
+    /// None = the deposit is native NEAR. Some(t) = the deposit is the NEP-141 token `t` (for example a USD stablecoin).
+    pub token: Option<AccountId>,
     // ---- progress: all zero at creation ----
     pub phase: u8,
     pub held: u128,
@@ -50,6 +52,13 @@ pub struct Vault {
     pub claim_at: u64,
     pub recovery_at: u64,
     pub redirected: bool,
+    /// Tenant's one recorded reply to the claim (hash of the reply and its evidence).
+    pub response_hash: [u8; 32],
+    pub response_at: u64,
+    /// Hash of the arbiter's written reasons, recorded with the ruling.
+    pub ruling_hash: [u8; 32],
+    /// Token payouts that failed (for example the payee was not registered with the token). Anyone can retry with `claim_owed`.
+    pub owed: Vec<(AccountId, u128)>,
 }
 
 #[derive(Serialize)]
@@ -66,6 +75,7 @@ pub struct View {
     pub recovery_timelock_ns: U64,
     pub arbiter_fee_bps: u16,
     pub terms_hash: String,
+    pub token: Option<AccountId>,
     pub phase: u8,
     pub held: U128,
     pub handover_at: U64,
@@ -75,6 +85,10 @@ pub struct View {
     pub claim_at: U64,
     pub recovery_at: U64,
     pub redirected: bool,
+    pub response_hash: String,
+    pub response_at: U64,
+    pub ruling_hash: String,
+    pub owed: Vec<(AccountId, U128)>,
 }
 
 fn hex(b: &[u8; 32]) -> String {
@@ -123,8 +137,26 @@ impl Vault {
         *who == self.payee()
     }
     fn pay(&self, to: &AccountId, amount: u128) {
-        if amount > 0 {
-            let _ = Promise::new(to.clone()).transfer(NearToken::from_yoctonear(amount));
+        if amount == 0 {
+            return;
+        }
+        match &self.token {
+            None => {
+                let _ = Promise::new(to.clone()).transfer(NearToken::from_yoctonear(amount));
+            }
+            Some(tok) => {
+                // Arguments are built by hand (account ids and decimal digits only) to keep the binary small.
+                let args = ["{\"receiver_id\":\"", to.as_str(), "\",\"amount\":\"", &n(amount), "\"}"].concat();
+                let cb = ["{\"to\":\"", to.as_str(), "\",\"amount\":\"", &n(amount), "\"}"].concat();
+                let _ = Promise::new(tok.clone())
+                    .function_call("ft_transfer".to_string(), args.into_bytes(), NearToken::from_yoctonear(1), Gas::from_tgas(15))
+                    .then(Promise::new(env::current_account_id()).function_call(
+                        "on_paid".to_string(),
+                        cb.into_bytes(),
+                        NearToken::from_yoctonear(0),
+                        Gas::from_tgas(8),
+                    ));
+            }
         }
     }
 }
@@ -136,12 +168,54 @@ impl Vault {
     /// Anyone may pay the deposit in, until the cap is reached.
     #[payable]
     pub fn fund(&mut self) {
+        require!(self.token.is_none(), "this vault takes a token: pay with ft_transfer_call");
         require!(self.phase == OPEN, "deposit is closed");
         let amt = env::attached_deposit().as_yoctonear();
         require!(amt > 0, "attach a deposit");
         require!(self.held + amt <= self.cap, "over the deposit cap");
         self.held += amt;
         log(&["EVENT funded amount=", &n(amt), " held=", &n(self.held)]);
+    }
+
+    /// NEP-141 receiver. The token contract calls this after `ft_transfer_call`. Returns the amount NOT used
+    /// (anything over the cap), which the token contract sends back to the payer.
+    pub fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> U128 {
+        let _ = (sender_id, msg);
+        require!(self.token.as_ref() == Some(&env::predecessor_account_id()), "this vault takes a different token");
+        require!(self.phase == OPEN, "deposit is closed");
+        require!(amount.0 > 0, "attach a deposit");
+        let room = self.cap - self.held;
+        let take = if amount.0 < room { amount.0 } else { room };
+        self.held += take;
+        log(&["EVENT funded amount=", &n(take), " held=", &n(self.held)]);
+        U128(amount.0 - take)
+    }
+
+    /// Callback after a token payout. If the token refused the transfer, remember the amount so it can be retried.
+    #[private]
+    pub fn on_paid(&mut self, to: AccountId, amount: U128) {
+        if env::promise_result_checked(0, 16).is_err() {
+            match self.owed.iter_mut().find(|e| e.0 == to) {
+                Some(e) => e.1 += amount.0,
+                None => self.owed.push((to.clone(), amount.0)),
+            }
+            log(&["EVENT payout_failed to=", to.as_str(), " amount=", &n(amount.0)]);
+        }
+    }
+
+    /// Anyone can retry a failed token payout (for example after the payee registered with the token).
+    pub fn claim_owed(&mut self, account: AccountId) {
+        let mut total = 0u128;
+        self.owed.retain(|e| {
+            if e.0 == account {
+                total += e.1;
+                false
+            } else {
+                true
+            }
+        });
+        require!(total > 0, "nothing owed to that account");
+        self.pay(&account, total);
     }
 
     // ---------- tenant ----------
@@ -162,6 +236,16 @@ impl Vault {
         require!(self.is_tenant(&env::predecessor_account_id()), "tenant only");
         let amt = self.held;
         self.settle(amt, 0, None);
+    }
+
+    /// Tenant puts one reply on the record while a claim is open (hash of the reply and any evidence).
+    pub fn respond(&mut self, response_hash: String) {
+        require!(self.phase == CLAIMED, "no claim");
+        require!(self.is_tenant(&env::predecessor_account_id()), "tenant only");
+        require!(self.response_hash == [0u8; 32], "a reply is already on the record");
+        self.response_hash = parse_hash(&response_hash);
+        self.response_at = env::block_timestamp();
+        log(&["EVENT response hash=", &response_hash]);
     }
 
     // ---------- landlord ----------
@@ -207,15 +291,25 @@ impl Vault {
 
     /// Arbiter splits the locked amount. Arbiter 1 any time after a claim; arbiter 2 only
     /// after the SLA has lapsed. landlord + fee + tenant == locked amount by construction.
-    pub fn rule(&mut self, landlord_amount: U128, arbiter_fee: U128) {
+    pub fn rule(&mut self, landlord_amount: U128, arbiter_fee: U128, reason_hash: String) {
         require!(self.phase == CLAIMED, "no claim");
         let who = env::predecessor_account_id();
         let a2_ok = env::block_timestamp() >= self.claim_at + self.arbiter_sla_ns;
         require!(who == self.arbiter1 || (who == self.arbiter2 && a2_ok), "not the arbiter on duty");
+        require!(env::block_timestamp() <= self.claim_at + 2 * self.arbiter_sla_ns, "ruling deadline passed: the claim can lapse");
+        self.ruling_hash = parse_hash(&reason_hash);
         let fee = arbiter_fee.0;
         require!(fee <= self.held * (self.arbiter_fee_bps as u128) / 10_000, "arbiter fee over the cap");
         require!(landlord_amount.0 + fee <= self.held, "split exceeds the locked amount");
         self.settle(landlord_amount.0, fee, Some(who));
+    }
+
+    /// Neither arbiter ruled by the deadline (two SLAs after the claim): the claim lapses and the tenant is refunded.
+    /// Refund by default also covers an arbiter who never shows up. Anyone can call this.
+    pub fn lapse_claim(&mut self) {
+        require!(self.phase == CLAIMED, "no claim");
+        require!(env::block_timestamp() > self.claim_at + 2 * self.arbiter_sla_ns, "arbiters still have time");
+        self.settle(0, 0, None);
     }
 
     // ---------- recovery of the refund address ----------
@@ -259,6 +353,7 @@ impl Vault {
             recovery_timelock_ns: U64(self.recovery_timelock_ns),
             arbiter_fee_bps: self.arbiter_fee_bps,
             terms_hash: hex(&self.terms_hash),
+            token: self.token.clone(),
             phase: self.phase,
             held: U128(self.held),
             handover_at: U64(self.handover_at),
@@ -268,6 +363,10 @@ impl Vault {
             claim_at: U64(self.claim_at),
             recovery_at: U64(self.recovery_at),
             redirected: self.redirected,
+            response_hash: hex(&self.response_hash),
+            response_at: U64(self.response_at),
+            ruling_hash: hex(&self.ruling_hash),
+            owed: self.owed.iter().map(|e| (e.0.clone(), U128(e.1))).collect(),
         }
     }
 }
@@ -317,10 +416,26 @@ mod tests {
             landlord: accounts(0), tenant: accounts(1), recovery: accounts(2),
             arbiter1: accounts(3), arbiter2: accounts(4),
             cap: 10 * ONE, claim_window_ns: WINDOW, arbiter_sla_ns: SLA,
-            recovery_timelock_ns: 300, arbiter_fee_bps: 500, terms_hash: [7; 32],
+            recovery_timelock_ns: 300, arbiter_fee_bps: 500, terms_hash: [7; 32], token: None,
             phase: OPEN, held: 0, handover_at: 0, claim_amount: 0, claim_kind: 0,
             claim_hash: [0; 32], claim_at: 0, recovery_at: 0, redirected: false,
+            response_hash: [0; 32], response_at: 0, ruling_hash: [0; 32], owed: vec![],
         }
+    }
+    fn token_vault() -> Vault {
+        let mut v = vault();
+        v.token = Some("usd.testnet".parse().unwrap());
+        v
+    }
+    fn token_funded_handed() -> Vault {
+        let mut v = token_vault();
+        ctx(accounts(5), 1, 0);
+        testing_env!(VMContextBuilder::new().predecessor_account_id("usd.testnet".parse().unwrap()).block_timestamp(1).build());
+        let unused = v.ft_on_transfer(accounts(5), U128(10 * ONE), String::new());
+        assert_eq!(unused.0, 0);
+        ctx(accounts(1), 10, 0);
+        v.declare_handover();
+        v
     }
     fn funded_handed() -> Vault {
         let mut v = vault();
@@ -416,7 +531,7 @@ mod tests {
         v.file_claim(U128(4 * ONE), KIND_DAMAGE, H.to_string());
         ctx(accounts(3), 30, 0);
         // cap is 5% of 4 NEAR = 0.2 NEAR
-        v.rule(U128(2 * ONE), U128(ONE / 10));
+        v.rule(U128(2 * ONE), U128(ONE / 10), H.to_string());
         assert_eq!(v.phase, SETTLED);
         assert_eq!(v.held, 0);
     }
@@ -427,7 +542,7 @@ mod tests {
         ctx(accounts(0), 20, 0);
         v.file_claim(U128(4 * ONE), KIND_DAMAGE, H.to_string());
         ctx(accounts(3), 30, 0);
-        v.rule(U128(ONE), U128(ONE));
+        v.rule(U128(ONE), U128(ONE), H.to_string());
     }
     #[test]
     #[should_panic(expected = "split exceeds the locked amount")]
@@ -436,7 +551,7 @@ mod tests {
         ctx(accounts(0), 20, 0);
         v.file_claim(U128(4 * ONE), KIND_DAMAGE, H.to_string());
         ctx(accounts(3), 30, 0);
-        v.rule(U128(4 * ONE), U128(ONE / 10));
+        v.rule(U128(4 * ONE), U128(ONE / 10), H.to_string());
     }
     #[test]
     #[should_panic(expected = "not the arbiter on duty")]
@@ -445,7 +560,7 @@ mod tests {
         ctx(accounts(0), 20, 0);
         v.file_claim(U128(ONE), KIND_DAMAGE, H.to_string());
         ctx(accounts(4), 20 + SLA - 1, 0);
-        v.rule(U128(0), U128(0));
+        v.rule(U128(0), U128(0), H.to_string());
     }
     #[test]
     fn arbiter2_rules_after_sla() {
@@ -453,7 +568,7 @@ mod tests {
         ctx(accounts(0), 20, 0);
         v.file_claim(U128(ONE), KIND_DAMAGE, H.to_string());
         ctx(accounts(4), 20 + SLA, 0);
-        v.rule(U128(ONE), U128(0));
+        v.rule(U128(ONE), U128(0), H.to_string());
         assert_eq!(v.phase, SETTLED);
     }
     #[test]
@@ -463,7 +578,117 @@ mod tests {
         ctx(accounts(0), 20, 0);
         v.file_claim(U128(ONE), KIND_DAMAGE, H.to_string());
         ctx(accounts(5), 9999, 0);
-        v.rule(U128(ONE), U128(0));
+        v.rule(U128(ONE), U128(0), H.to_string());
+    }
+    #[test]
+    fn token_vault_takes_only_its_token_and_refunds_over_cap() {
+        let mut v = token_vault();
+        testing_env!(VMContextBuilder::new().predecessor_account_id("usd.testnet".parse().unwrap()).build());
+        assert_eq!(v.ft_on_transfer(accounts(5), U128(7 * ONE), String::new()).0, 0);
+        // 3 of 10 left: a payment of 5 keeps 3 and sends 2 back
+        assert_eq!(v.ft_on_transfer(accounts(5), U128(5 * ONE), String::new()).0, 2 * ONE);
+        assert_eq!(v.held, 10 * ONE);
+    }
+    #[test]
+    #[should_panic(expected = "this vault takes a different token")]
+    fn token_vault_rejects_other_token() {
+        let mut v = token_vault();
+        testing_env!(VMContextBuilder::new().predecessor_account_id("fake.testnet".parse().unwrap()).build());
+        v.ft_on_transfer(accounts(5), U128(ONE), String::new());
+    }
+    #[test]
+    #[should_panic(expected = "this vault takes a token")]
+    fn token_vault_rejects_native_fund() {
+        let mut v = token_vault();
+        ctx(accounts(5), 1, ONE);
+        v.fund();
+    }
+    #[test]
+    #[should_panic(expected = "this vault takes a different token")]
+    fn native_vault_rejects_token_deposit() {
+        let mut v = vault();
+        testing_env!(VMContextBuilder::new().predecessor_account_id("usd.testnet".parse().unwrap()).build());
+        v.ft_on_transfer(accounts(5), U128(ONE), String::new());
+    }
+    #[test]
+    fn token_vault_settles_by_default() {
+        let mut v = token_funded_handed();
+        ctx(accounts(5), 10 + WINDOW + 1, 0);
+        v.release();
+        assert_eq!(v.phase, SETTLED);
+        assert_eq!(v.held, 0);
+    }
+    #[test]
+    fn tenant_reply_is_recorded_once() {
+        let mut v = funded_handed();
+        ctx(accounts(0), 20, 0);
+        v.file_claim(U128(ONE), KIND_DAMAGE, H.to_string());
+        ctx(accounts(1), 25, 0);
+        v.respond(H.to_string());
+        assert_eq!(v.response_at, 25);
+        assert_ne!(v.response_hash, [0u8; 32]);
+    }
+    #[test]
+    #[should_panic(expected = "a reply is already on the record")]
+    fn tenant_cannot_reply_twice() {
+        let mut v = funded_handed();
+        ctx(accounts(0), 20, 0);
+        v.file_claim(U128(ONE), KIND_DAMAGE, H.to_string());
+        ctx(accounts(1), 25, 0);
+        v.respond(H.to_string());
+        v.respond(H.to_string());
+    }
+    #[test]
+    #[should_panic(expected = "tenant only")]
+    fn landlord_cannot_reply_for_tenant() {
+        let mut v = funded_handed();
+        ctx(accounts(0), 20, 0);
+        v.file_claim(U128(ONE), KIND_DAMAGE, H.to_string());
+        v.respond(H.to_string());
+    }
+    #[test]
+    fn ruling_records_reason_hash() {
+        let mut v = funded_handed();
+        ctx(accounts(0), 20, 0);
+        v.file_claim(U128(ONE), KIND_DAMAGE, H.to_string());
+        ctx(accounts(3), 30, 0);
+        v.rule(U128(ONE), U128(0), H.to_string());
+        assert_ne!(v.ruling_hash, [0u8; 32]);
+    }
+    #[test]
+    fn silent_arbiters_lapse_the_claim_to_the_tenant() {
+        let mut v = funded_handed();
+        ctx(accounts(0), 20, 0);
+        v.file_claim(U128(4 * ONE), KIND_DAMAGE, H.to_string());
+        ctx(accounts(5), 20 + 2 * SLA + 1, 0);
+        v.lapse_claim();
+        assert_eq!(v.phase, SETTLED);
+        assert_eq!(v.held, 0);
+    }
+    #[test]
+    #[should_panic(expected = "arbiters still have time")]
+    fn lapse_not_before_the_deadline() {
+        let mut v = funded_handed();
+        ctx(accounts(0), 20, 0);
+        v.file_claim(U128(ONE), KIND_DAMAGE, H.to_string());
+        ctx(accounts(5), 20 + 2 * SLA, 0);
+        v.lapse_claim();
+    }
+    #[test]
+    #[should_panic(expected = "ruling deadline passed")]
+    fn no_ruling_after_deadline() {
+        let mut v = funded_handed();
+        ctx(accounts(0), 20, 0);
+        v.file_claim(U128(ONE), KIND_DAMAGE, H.to_string());
+        ctx(accounts(3), 20 + 2 * SLA + 1, 0);
+        v.rule(U128(ONE), U128(0), H.to_string());
+    }
+    #[test]
+    #[should_panic(expected = "nothing owed")]
+    fn claim_owed_with_nothing_fails() {
+        let mut v = token_vault();
+        ctx(accounts(5), 1, 0);
+        v.claim_owed(accounts(1));
     }
     #[test]
     fn landlord_can_withdraw_claim() {

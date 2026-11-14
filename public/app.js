@@ -1,5 +1,5 @@
-import { Account, JsonRpcProvider, KeyPairSigner, KeyPair, DeterministicStateInit, NearConnector, actions } from "./near.bundle.js";
-import { encodeState, b58, sha256Hex, sha256, utf8, parseNear, fmtNear, toHex } from "./state.js";
+import { Account, JsonRpcProvider, KeyPairSigner, KeyPair, DeterministicStateInit, NearConnector, actions } from "./near.bundle.js?v=20261114";
+import { encodeState, b58, sha256Hex, sha256, utf8, parseNear, fmtNear, parseUnits, fmtUnits, toHex } from "./state.js?v=20261114";
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); Object.assign(e, props); for (const k of kids) e.append(k); return e; };
@@ -48,6 +48,19 @@ async function viewCall(id, method, args = {}) {
   const r = await rpc("query", { request_type: "call_function", finality: "optimistic", account_id: id, method_name: method, args_base64: btoa(JSON.stringify(args)) });
   return JSON.parse(new TextDecoder().decode(Uint8Array.from(r.result)));
 }
+// ---------- deposit currency: native NEAR, or a NEP-141 token such as a dollar stablecoin ----------
+const tokCache = new Map();
+async function tokenInfo(id) {
+  if (!id) return { id: null, symbol: "NEAR", decimals: 24 };
+  if (tokCache.has(id)) return tokCache.get(id);
+  let m; try { m = await viewCall(id, "ft_metadata"); } catch { m = { symbol: "token", decimals: 0 }; }
+  const t = { id, symbol: m.symbol, decimals: m.decimals }; tokCache.set(id, t); return t;
+}
+const A = () => (current && current.tok) || { id: null, symbol: "NEAR", decimals: 24 };
+const fmtA = (y) => fmtUnits(y, A().decimals);
+const parseA = (x) => parseUnits(x, A().decimals);
+const hasV2 = (s) => "ruling_hash" in s; // vaults from the first published build have no reply / lapse / ruling-reason features
+const zeroHash = (h) => /^0+$/.test(h || "");
 let connector = null, wallet = null, acting = "key"; // wallet = { id }
 let demo = null, demoKeys = null; // demo = { role }, demoKeys = shared throwaway accounts
 const actorId = () => (demo && demoKeys ? demoKeys[demo.role].id : acting === "wallet" && wallet ? wallet.id : me ? me.id : null);
@@ -175,18 +188,19 @@ async function loadVault(id, quiet = false) {
   $("#vault-empty").hidden = true;
   const view = $("#vault-view");
   if (!quiet) { view.hidden = true; $("#vault-empty").hidden = false; $("#vault-empty").textContent = "Reading the chain…"; }
-  let acc, state;
+  let acc, state, tok;
   try {
     const blk = await rpc("block", { finality: "optimistic" });
     skewMs = Number(BigInt(blk.header.timestamp) / NS) - Date.now();
     acc = await viewAccount(id);
     state = await viewCall(id, "get_state");
+    tok = await tokenInfo(state.token || null);
   } catch (x) {
     $("#vault-empty").hidden = false; view.hidden = true;
     $("#vault-empty").textContent = /does not exist/i.test(String(x.message)) ? "No account with that address exists on " + netName() + "." : "That account is not a Cautio vault, or the chain could not be read: " + friendly(x);
     return;
   }
-  current = { id, state, acc };
+  current = { id, state, acc, tok };
   remember(id);
   $("#vault-empty").hidden = true; view.hidden = false;
   renderVault();
@@ -198,23 +212,30 @@ function renderVault() {
   const held = BigInt(s.held), cap = BigInt(s.cap);
   let phase = PHASES[s.phase], next = "";
   const winEnd = BigInt(s.handover_at) + BigInt(s.claim_window_ns);
-  if (s.phase === 0) next = `Next: someone pays in the deposit (up to ${fmtNear(cap)} NEAR), then the tenant declares handover.`;
+  if (s.phase === 0) next = `Next: someone pays in the deposit (up to ${fmtA(cap)} ${A().symbol}), then the tenant declares handover.`;
   if (s.phase === 1) {
     const open = nowNs() <= winEnd;
     phase = open ? "Handed over: the landlord can file one claim" : "Handed over: window closed, no claim filed";
     next = open ? `The landlord's claim window closes in ${left(winEnd)} (${t2(winEnd)}). If no claim is filed, anyone can trigger the refund to the tenant.` : "Anyone can now trigger the refund to the tenant.";
   }
-  if (s.phase === 2) next = `A claim of ${fmtNear(s.claim_amount)} NEAR is locked. Arbiter 1 rules; arbiter 2 can rule from ${t2(BigInt(s.claim_at) + BigInt(s.arbiter_sla_ns))} if arbiter 1 stays silent.`;
+  if (s.phase === 2) {
+    const dl = BigInt(s.claim_at) + 2n * BigInt(s.arbiter_sla_ns);
+    next = `A claim of ${fmtA(s.claim_amount)} ${A().symbol} is locked. ` + (hasV2(s) && !zeroHash(s.response_hash) ? "The tenant has put a reply on the record. " : "")
+      + `Arbiter 1 rules; arbiter 2 can rule from ${t2(BigInt(s.claim_at) + BigInt(s.arbiter_sla_ns))} if arbiter 1 stays silent.`
+      + (hasV2(s) ? (nowNs() > dl ? " The ruling deadline has passed: anyone can now close the claim in the tenant's favour." : ` If neither arbiter rules by ${t2(dl)}, the claim lapses and the tenant is refunded.`) : "");
+  }
   if (s.phase === 3) next = "This vault is settled. The funds have been paid out by the contract rules.";
   $("#phase").textContent = phase;
   $("#next").textContent = next;
   const kv = (dl, rows) => dl.replaceChildren(...rows.flatMap(([k, v, cls]) => [el("dt", { textContent: k }), el("dd", { textContent: v, className: cls || "" })]));
   kv($("#figures"), [
-    ["Held by the vault", fmtNear(held) + " NEAR", "num"],
-    ["Deposit cap", fmtNear(cap) + " NEAR", "num"],
+    ["Held by the vault", fmtA(held) + " " + A().symbol, "num"],
+    ["Deposit cap", fmtA(cap) + " " + A().symbol, "num"],
+    ["Currency", s.token ? A().symbol + " (token " + short(s.token) + ")" : "NEAR", "num"],
     ["Claim window", dur(s.claim_window_ns), "num"],
     ["Arbiter 2 may act after", dur(s.arbiter_sla_ns) + " of silence", "num"],
     ["Arbiter fee cap", (s.arbiter_fee_bps / 100) + "% of the locked amount", "num"],
+    ...(hasV2(s) ? [["Ruling deadline", "2 x the arbiter wait after a claim, then it lapses to the tenant", "num"]] : []),
     ["Lease terms hash", short(s.terms_hash), "addr"],
   ]);
   const yours = new Set(roleList(s));
@@ -233,7 +254,10 @@ function renderVault() {
 }
 
 // ---------- actions ----------
-const GAS = { fund: 20, declare_handover: 20, file_claim: 40, withdraw_claim: 40, accept_claim: 40, release: 40, rule: 40, start_recovery: 20, cancel_recovery: 20, complete_recovery: 20 };
+const GAS = { fund: 20, declare_handover: 20, file_claim: 40, withdraw_claim: 40, accept_claim: 40, release: 40, rule: 40, respond: 20, lapse_claim: 40, claim_owed: 40, start_recovery: 20, cancel_recovery: 20, complete_recovery: 20 };
+// Token payouts are cross-contract calls (one transfer plus a check per payee), so those methods need more gas.
+const TOKEN_HEAVY = new Set(["file_claim", "withdraw_claim", "accept_claim", "release", "rule", "lapse_claim", "claim_owed"]);
+const gasFor = (m) => (current && current.state.token && TOKEN_HEAVY.has(m) ? 120 : GAS[m] || 40);
 const T12 = 10n ** 12n;
 // One transaction with several actions, signed by the connected wallet or by the browser key.
 async function sendTx(receiverId, specs) {
@@ -255,12 +279,12 @@ async function sendTx(receiverId, specs) {
   return r.transaction.hash;
 }
 const callContract = (contractId, method, args, deposit, gasT) => sendTx(contractId, [{ t: "call", method, args, deposit, gas: gasT }]);
-async function send(method, args, depositYocto = 0n, doneText = "Done.") {
+async function send(method, args, depositYocto = 0n, doneText = "Done.", target = {}) {
   const msg = $("#act-msg");
   say(msg, "Sending to the network…");
   for (const b of document.querySelectorAll("#actions button")) b.disabled = true;
   try {
-    const tx = await callContract(current.id, method, args, depositYocto, GAS[method]);
+    const tx = await callContract(target.to || current.id, method, args, depositYocto, target.gas || gasFor(method));
     msg.className = "msg";
     msg.replaceChildren(doneText + " ", el("a", { href: `${EXPLORER()}/txns/${tx}`, target: "_blank", rel: "noopener", textContent: "View transaction" }));
   } catch (x) { say(msg, friendly(x), true); }
@@ -310,20 +334,30 @@ function renderActions() {
 
   if (s.phase === 0) {
     const room = cap - held;
-    if (room > 0n) box.append(act("Pay deposit", `Anyone can pay in. Room left under the cap: ${fmtNear(room)} NEAR. The money goes into the vault and only the contract rules can move it.`, [["amt", "Amount (NEAR)", fmtNear(room), "text"]], async (i) => {
-      const y = parseNear(i.amt.value); if (y <= 0n || y > room) throw new Error(`Enter an amount up to ${fmtNear(room)} NEAR.`);
-      await send("fund", {}, y, "Deposit paid in.");
+    const sym = A().symbol;
+    if (s.token && cfg.stable && s.token === cfg.stable.id && cfg.stable.test && aid) box.append(act("Get test dollars", "This is a test token with no value. It gives your account 1,000 tUSD so you can pay a deposit. On mainnet the vault uses a real stablecoin instead.", [], async () => {
+      const m = $("#act-msg"); say(m, "Minting test dollars…");
+      await callContract(s.token, "mint", { account_id: aid, amount: "1000000000" }, 0n, 30);
+      say(m, "1,000 tUSD added to " + short(aid) + ".");
+    }, false));
+    if (room > 0n) box.append(act("Pay deposit", `Anyone can pay in. Room left under the cap: ${fmtA(room)} ${sym}. The money goes into the vault and only the contract rules can move it.`, [["amt", `Amount (${sym})`, fmtA(room), "text"]], async (i) => {
+      const y = parseA(i.amt.value); if (y <= 0n || y > room) throw new Error(`Enter an amount up to ${fmtA(room)} ${sym}.`);
+      if (s.token) {
+        const bal = BigInt(await viewCall(s.token, "ft_balance_of", { account_id: aid }));
+        if (bal < y) throw new Error(`This account holds ${fmtA(bal)} ${sym}, less than ${fmtA(y)}.` + (cfg.stable && cfg.stable.test ? " Use \"Get test dollars\" first." : ""));
+        await send("ft_transfer_call", { receiver_id: current.id, amount: y.toString(), msg: "" }, 1n, "Deposit paid in.", { to: s.token, gas: 100 });
+      } else await send("fund", {}, y, "Deposit paid in.");
     }));
     if (has("tenant") && held > 0n) box.append(act("Declare handover", "Keys handed over. This starts the landlord's claim window and cannot be undone.", [], () => send("declare_handover", {}, 0n, "Handover declared; the claim window is open.")));
   }
   if (s.phase === 1) {
     if (has("landlord") && winOpen) box.append(act("File claim", "One claim, inside the window. Only the claimed amount is locked; the rest goes back to the tenant at once. Describe the move-out condition: the text or file is hashed in your browser and only the hash goes on chain.", [
-      ["amt", "Claimed amount (NEAR)", fmtNear(held), "text"],
+      ["amt", `Claimed amount (${A().symbol})`, fmtA(held), "text"],
       ["kind", "Kind", "", "select", [["0", "Damage"], ["1", "Service-charge shortfall"]]],
       ["note", "Move-out report", "What was found at move-out", "area"],
       ["file", "Or a file (photos, PDF)", "", "file"],
     ], async (i) => {
-      const y = parseNear(i.amt.value); if (y <= 0n || y > held) throw new Error(`The claim must be between 0 and ${fmtNear(held)} NEAR.`);
+      const y = parseA(i.amt.value); if (y <= 0n || y > held) throw new Error(`The claim must be between 0 and ${fmtA(held)} ${A().symbol}.`);
       const f = i.file.files[0];
       const hash = f ? await sha256Hex(new Uint8Array(await f.arrayBuffer())) : await sha256Hex(i.note.value.trim());
       if (!f && !i.note.value.trim()) throw new Error("Write the move-out report, or choose a file.");
@@ -335,20 +369,45 @@ function renderActions() {
     if (winOpen && !has("landlord")) box.append(el("p", { className: "muted", textContent: "Waiting for the claim window to close. Only the landlord can act now." }));
   }
   if (s.phase === 2) {
-    if (has("tenant")) box.append(act("Accept claim", "Pay the claimed amount to the landlord and close the vault.", [], () => send("accept_claim", {}, 0n, "Claim accepted."), false));
-    if (has("landlord")) box.append(act("Withdraw claim", "Drop the claim. The locked amount goes to the tenant.", [], () => send("withdraw_claim", {}, 0n, "Claim withdrawn."), false));
     const a2ok = nowNs() >= BigInt(s.claim_at) + BigInt(s.arbiter_sla_ns);
-    if (has("arbiter1") || (has("arbiter2") && a2ok)) {
+    const v2 = hasV2(s), ruleDeadline = BigInt(s.claim_at) + 2n * BigInt(s.arbiter_sla_ns), lapsed = v2 && nowNs() > ruleDeadline;
+    const sym = A().symbol;
+    // a document or a typed note is hashed here; only the hash goes on chain, and a copy is downloaded for the author to keep
+    const hashed = async (i, what, extra) => {
+      const f = i.file.files[0], note = i.note.value.trim();
+      if (!f && !note) throw new Error(`Write ${what}, or choose a file.`);
+      const hash = f ? await sha256Hex(new Uint8Array(await f.arrayBuffer())) : await sha256Hex(note);
+      const rec = { vault: current.id, by: actorId(), ...extra, sha256: hash, text: f ? { fileName: f.name, bytes: f.size, note: "Keep the original file: its SHA-256 must match." } : note, createdAt: new Date().toISOString() };
+      el("a", { href: URL.createObjectURL(new Blob([JSON.stringify(rec, null, 2)], { type: "application/json" })), download: `cautio-${what.split(" ").pop()}-${hash.slice(0, 10)}.json` }).click();
+      return hash;
+    };
+    if (has("tenant") && v2 && zeroHash(s.response_hash) && !lapsed) box.append(act("Reply to the claim", "Put your side on the record: what you say about the claim, with any photos or receipts. It is hashed in your browser and only the hash goes on chain, so the arbiter can check the file you hand over. One reply per claim.", [
+      ["note", "Your reply", "What you say about the claim", "area"],
+      ["file", "Or a file (photos, receipts)", "", "file"],
+    ], async (i) => {
+      const hash = await hashed(i, "your reply", { kind: "tenant reply" });
+      await send("respond", { response_hash: hash }, 0n, "Reply recorded. A copy was downloaded: keep it, the chain holds only its hash.");
+    }, false));
+    if (has("tenant") && !lapsed) box.append(act("Accept claim", "Pay the claimed amount to the landlord and close the vault.", [], () => send("accept_claim", {}, 0n, "Claim accepted."), false));
+    if (has("landlord") && !lapsed) box.append(act("Withdraw claim", "Drop the claim. The locked amount goes to the tenant.", [], () => send("withdraw_claim", {}, 0n, "Claim withdrawn."), false));
+    if (lapsed) box.append(act("Close the lapsed claim", "Neither arbiter ruled in time. The claim lapses and the locked amount goes back to the tenant. Anyone can do this.", [], () => send("lapse_claim", {}, 0n, "Claim closed: the tenant was refunded."), true));
+    else if (has("arbiter1") || (has("arbiter2") && a2ok)) {
       const feeCap = held * BigInt(s.arbiter_fee_bps) / 10000n;
-      box.append(act("Rule", `Split the locked ${fmtNear(held)} NEAR. The rest goes to the tenant. The fee cap is ${fmtNear(feeCap)} NEAR.`, [
-        ["l", "To landlord (NEAR)", "0", "text"], ["fee", "Arbiter fee (NEAR)", "0", "text"],
+      box.append(act("Rule", `Split the locked ${fmtA(held)} ${sym}. The rest goes to the tenant. The fee cap is ${fmtA(feeCap)} ${sym}.` + (v2 ? ` Give your reasons: they are hashed and recorded with the ruling. Deadline ${t2(ruleDeadline)}.` : ""), [
+        ["l", `To landlord (${sym})`, "0", "text"], ["fee", `Arbiter fee (${sym})`, "0", "text"],
+        ...(v2 ? [["note", "Your reasons", "Why you ruled this way", "area"], ["file", "Or a file", "", "file"]] : []),
       ], async (i) => {
-        const l = parseNear(i.l.value), fee = parseNear(i.fee.value);
-        if (fee > feeCap) throw new Error(`The fee cap is ${fmtNear(feeCap)} NEAR.`);
+        const l = parseA(i.l.value), fee = parseA(i.fee.value);
+        if (fee > feeCap) throw new Error(`The fee cap is ${fmtA(feeCap)} ${sym}.`);
         if (l + fee > held) throw new Error("Landlord amount plus fee is more than the locked amount.");
-        await send("rule", { landlord_amount: l.toString(), arbiter_fee: fee.toString() }, 0n, "Ruling recorded and paid out.");
+        const args = { landlord_amount: l.toString(), arbiter_fee: fee.toString() };
+        if (v2) args.reason_hash = await hashed(i, "your reasons", { kind: "arbiter reasons", landlordAmount: l.toString(), arbiterFee: fee.toString() });
+        await send("rule", args, 0n, "Ruling recorded and paid out.");
       }));
     } else if (has("arbiter2")) box.append(el("p", { className: "muted", textContent: `Arbiter 2 can rule from ${t2(BigInt(s.claim_at) + BigInt(s.arbiter_sla_ns))}.` }));
+  }
+  if (s.owed && s.owed.length) for (const [who, amt] of s.owed) {
+    box.append(act("Retry a payout", `A payout of ${fmtA(amt)} ${A().symbol} to ${short(who)} failed, usually because that account is not registered with the token. Register it with the token, then retry. Anyone can retry.`, [], () => send("claim_owed", { account: who }, 0n, "Payout retried."), false));
   }
   if (s.phase < 3) {
     const recAt = BigInt(s.recovery_at), tl = BigInt(s.recovery_timelock_ns);
@@ -381,7 +440,14 @@ async function runChecks(id, acc, state) {
       } catch (x) { rows.push(row("info", "INFO", "Could not fetch the published code to re-hash it: " + x.message)); }
     } else if (ga) rows.push(row("fail", "FAIL", "Code is referenced by publisher account " + ga + ". The publisher could change it."));
     else rows.push(row("fail", "FAIL", "This account does not use a global contract by hash."));
-    rows.push(row("info", "INFO", `Account balance ${fmtNear(acc.amount)} NEAR; the vault tracks ${fmtNear(state.held)} NEAR as held. The difference is the small storage buffer.`));
+    if (state.token) {
+      try {
+        const b = BigInt(await viewCall(state.token, "ft_balance_of", { account_id: id }));
+        const sym = current.tok.symbol, d = current.tok.decimals;
+        rows.push(b >= BigInt(state.held) ? row("pass", "PASS", `The vault's ${sym} balance (${fmtUnits(b, d)}) covers the ${fmtUnits(state.held, d)} ${sym} it tracks as held.`) : row("fail", "FAIL", `The vault's ${sym} balance (${fmtUnits(b, d)}) is below the ${fmtUnits(state.held, d)} it tracks as held.`));
+      } catch (x) { rows.push(row("info", "INFO", "Could not read the token balance: " + x.message)); }
+      rows.push(row("info", "INFO", `Deposit token: ${state.token}. The vault's own NEAR balance (${fmtNear(acc.amount)} NEAR) is only a small reserve for token transfers.`));
+    } else rows.push(row("info", "INFO", `Account balance ${fmtNear(acc.amount)} NEAR; the vault tracks ${fmtNear(state.held)} NEAR as held. The difference is the small storage buffer.`));
     const ref = (cfg.unit && id === cfg.vault) ? { unit: cfg.unit, token: cfg.token } : nftRef(id);
     if (ref) {
       try {
@@ -397,12 +463,32 @@ async function runChecks(id, acc, state) {
 
 // ---------- open a vault ----------
 const unitNs = (n, u) => BigInt(Math.round(Number(n))) * (u === "d" ? 86_400n : 60n) * 1_000_000_000n;
-const OPEN_BUFFER = 5n * 10n ** 22n; // 0.05 NEAR left in the vault as a storage buffer
+const OPEN_BUFFER = 5n * 10n ** 22n; // balance the opener must hold beyond fees (conservative)
+const VAULT_RESERVE = 2n * 10n ** 22n; // 0.02 NEAR sent to a token vault
+const wantsToken = () => !!cfg.stable && $("#o-cur").value === "stable";
 async function updateOpenCost() {
-  $("#open-cost").textContent = me
-    ? `Cost: 0.05 NEAR goes into the vault as a storage buffer, plus a small fee, both paid by ${short(me.id)}.`
+  const tk = wantsToken();
+  $("label[for=o-cap]").textContent = "Deposit cap (" + (tk ? cfg.stable.symbol : "NEAR") + ")";
+  $("#open-cost").textContent = me || demo
+    ? (tk
+      ? `Cost: about 0.04 NEAR, paid by ${short((payer() || me).id)}: 0.02 NEAR goes into the vault so it can pay out ${cfg.stable.symbol}, the rest is network fees and registering the parties with ${cfg.stable.symbol}.`
+      : `Cost: a small network fee, about 0.01 NEAR, paid by ${short((payer() || me).id)}.`)
     : "You need an account first: open the Account tab and create one.";
 }
+// A token vault can only receive and pay out for accounts registered with the token contract (NEP-141 storage).
+async function registerWithToken(tokenId, accounts) {
+  const bounds = await viewCall(tokenId, "storage_balance_bounds");
+  const need = [];
+  for (const a of [...new Set(accounts)]) if (!(await viewCall(tokenId, "storage_balance_of", { account_id: a }))) need.push(a);
+  if (!need.length) return;
+  await sendTx(tokenId, need.map((a) => ({ t: "call", method: "storage_deposit", args: { account_id: a, registration_only: true }, deposit: BigInt(bounds.min), gas: 8 })));
+}
+function setupCurrency() {
+  const sel = $("#o-cur"); sel.replaceChildren(el("option", { value: "near", textContent: "NEAR" }));
+  if (cfg.stable) { sel.append(el("option", { value: "stable", textContent: cfg.stable.symbol + (cfg.stable.test ? " (test dollar)" : " (dollar stablecoin)") })); sel.value = "stable"; }
+  updateOpenCost();
+}
+$("#o-cur").addEventListener("change", updateOpenCost);
 for (const b of document.querySelectorAll("[data-me]")) b.addEventListener("click", () => {
   const a = actorId() || (me && me.id);
   if (!a) { say($("#open-msg"), "Connect a wallet or create an account in the Account tab first.", true); return; }
@@ -421,7 +507,8 @@ $("#open-form").addEventListener("submit", async (e) => {
     if ([ids.arbiter1, ids.arbiter2].some((a) => a === ids.landlord || a === ids.tenant)) throw new Error("Arbiters must not be the landlord or the tenant.");
     if (ids.arbiter1 === ids.arbiter2) throw new Error("Arbiter 1 and arbiter 2 must be different.");
     if (ids.recovery === ids.landlord) throw new Error("The tenant's recovery account must not be the landlord.");
-    const cap = parseNear(v.cap); if (cap <= 0n) throw new Error("The cap must be above zero.");
+    const cur = wantsToken() ? await tokenInfo(cfg.stable.id) : await tokenInfo(null);
+    const cap = parseUnits(v.cap, cur.decimals); if (cap <= 0n) throw new Error("The cap must be above zero.");
     const bps = Math.round(Number(v.fee) * 100); if (!(bps >= 0 && bps <= 1000)) throw new Error("The arbiter fee cap must be between 0 and 10 percent.");
     for (const [k, n] of [["claim window", v.window], ["arbiter wait", v.sla], ["recovery wait", v.timelock]]) if (!(Number(n) >= 1)) throw new Error(`The ${k} must be at least 1.`);
     const terms = v.terms.trim(); if (!terms) throw new Error("Paste the lease terms. Only their hash goes on chain.");
@@ -429,19 +516,26 @@ $("#open-form").addEventListener("submit", async (e) => {
     const [bal, tb, rb] = await Promise.all([getBalance(payer().id), getBalance(ids.tenant), getBalance(ids.recovery)]);
     if (tb === null) throw new Error("The tenant refund account does not exist on " + netName() + " yet. A refund to a missing account would fail, so fund or create it first.");
     if (rb === null) throw new Error("The recovery account does not exist on " + netName() + " yet. Fund or create it first.");
-    if (bal === null || bal < OPEN_BUFFER + 10n ** 22n) throw new Error("Your account needs at least about 0.07 NEAR. See the Account tab.");
+    if (bal === null || bal < OPEN_BUFFER + (cur.id ? 4n : 1n) * 10n ** 22n) throw new Error("Your account needs at least about " + (cur.id ? "0.1" : "0.07") + " NEAR. See the Account tab.");
     const salt = toHex(crypto.getRandomValues(new Uint8Array(16)));
     const doc = JSON.stringify({ lease: terms, salt, created: new Date().toISOString() });
     const termsHashHex = await sha256Hex(doc);
     const state = {
       ...ids, capYocto: cap, claimWindowNs: unitNs(v.window, v.windowUnit), arbiterSlaNs: unitNs(v.sla, v.slaUnit),
-      recoveryTimelockNs: unitNs(v.timelock, v.timelockUnit), arbiterFeeBps: bps, termsHashHex,
+      recoveryTimelockNs: unitNs(v.timelock, v.timelockUnit), arbiterFeeBps: bps, termsHashHex, token: cur.id,
     };
     const stateInit = new DeterministicStateInit({ code: { codeHash: cfg.pinnedCodeHash }, data: [[utf8("STATE"), encodeState(state)]] });
     const vaultId = stateInit.deriveAccountId();
     say(msg, "Creating the vault on " + netName() + "…");
     const prevRole = demo && demo.role; if (demo) demo.role = "landlord";
     const r = await signerAccount().createDeterministicAccount({ stateInit, deposit: OPEN_BUFFER });
+    if (cur.id) {
+      // a new vault holds no NEAR of its own; it needs a little to attach the 1 yoctoNEAR a token transfer requires, and for the failed-payout record
+      say(msg, "Preparing the vault for " + cur.symbol + "…");
+      await signerAccount().transfer({ receiverId: vaultId, amount: VAULT_RESERVE });
+      say(msg, "Registering the vault and the parties with " + cur.symbol + "…");
+      for (let i = 0; i < 8; i++) { try { await registerWithToken(cur.id, [vaultId, ids.landlord, ids.tenant, ids.recovery, ids.arbiter1, ids.arbiter2]); break; } catch (x) { if (i === 7) throw x; await new Promise((res) => setTimeout(res, 1500)); } }
+    }
     if (demo) demo.role = prevRole;
     const tx = r.transaction.hash;
     // the new account can lag a moment behind the transaction result
@@ -608,12 +702,14 @@ $("#demo-start").addEventListener("click", async () => {
     const set = (id, v) => { $("#" + id).value = v; };
     set("o-landlord", demoKeys.landlord.id); set("o-tenant", demoKeys.tenant.id); set("o-recovery", demoKeys.recovery.id);
     set("o-arb1", demoKeys.arbiter1.id); set("o-arb2", demoKeys.arbiter2.id);
-    set("o-cap", "0.3"); set("o-window", "2"); $("[name=windowUnit]").value = "m";
+    $("#o-cur").value = cfg.stable ? "stable" : "near";
+    set("o-cap", cfg.stable ? "300" : "0.3"); set("o-window", "2"); $("[name=windowUnit]").value = "m";
     set("o-sla", "1"); $("[name=slaUnit]").value = "m"; set("o-timelock", "2"); $("[name=timelockUnit]").value = "m";
     set("o-fee", "5"); set("o-terms", "Demo lease, flat 3B, 12 months. Move-in report v1. (Demo run " + new Date().toISOString() + ")");
     const done = new Promise((res, rej) => { window.__demoOpened = res; window.__demoFail = rej; });
     $("#open-form").requestSubmit();
     const vaultId = await Promise.race([done, new Promise((_, rej) => setTimeout(() => rej(new Error("The vault took too long to appear. Try again.")), 60000))]);
+    if (cfg.stable && $("#o-cur").value === "stable") { say(msg, "Giving the demo tenant test dollars…"); await callContract(cfg.stable.id, "mint", { account_id: demoKeys.tenant.id, amount: "1000000000" }, 0n, 30); }
     sessionStorage.setItem("cautio.demo", "1");
     say(msg, "Demo vault ready. You are the landlord. Follow the Next line below.");
     openVault(vaultId); demo.role = "tenant"; demoRender();
@@ -624,13 +720,14 @@ $("#demo-exit").addEventListener("click", () => { demo = null; sessionStorage.re
 
 // ---------- boot ----------
 loadMe();
-fetch("config.json").then((r) => r.json()).then((c) => {
+fetch("config.json", { cache: "no-cache" }).then((r) => r.json()).then((c) => {
   const want = new URLSearchParams(location.search).get("network");
   const net = c.networks && c.networks[want] ? want : c.network;
   cfg = { ...cfg, ...c.networks[net], network: net };
   $("#net-tag").textContent = cfg.label || net;
   document.title = "Cautio · " + (cfg.label || net);
   provider = new JsonRpcProvider({ url: cfg.rpc });
+  setupCurrency();
   if (!cfg.pinnedCodeHash) { $("#open-btn").disabled = true; say($("#open-msg"), "Cautio's contract is not published on " + net + " yet, so vaults cannot be opened here.", true); }
   initWallet();
   renderRecent();

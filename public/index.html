@@ -105,6 +105,7 @@
       <div class="f"><label for="o-recovery">Tenant recovery account</label><input id="o-recovery" name="recovery" required spellcheck="false" autocapitalize="none" placeholder="used if the tenant loses their key"><button type="button" class="mini" data-me="o-recovery">Use my account</button></div>
       <div class="f"><label for="o-arb1">Arbiter 1</label><input id="o-arb1" name="arbiter1" required spellcheck="false" autocapitalize="none" placeholder="arbiter.testnet"><button type="button" class="mini" data-me="o-arb1">Use my account</button></div>
       <div class="f"><label for="o-arb2">Arbiter 2 (backup)</label><input id="o-arb2" name="arbiter2" required spellcheck="false" autocapitalize="none" placeholder="steps in if arbiter 1 is silent"><button type="button" class="mini" data-me="o-arb2">Use my account</button></div>
+      <div class="f"><label for="o-cur">Deposit currency</label><select id="o-cur" name="currency"><option value="near">NEAR</option></select></div>
       <div class="f"><label for="o-cap">Deposit cap (NEAR)</label><input id="o-cap" name="cap" required inputmode="decimal" value="5"></div>
       <div class="f"><label for="o-window">Landlord claim window</label><div class="pair"><input id="o-window" name="window" required inputmode="numeric" value="7"><select name="windowUnit" aria-label="Claim window unit"><option value="d">days</option><option value="m">minutes</option></select></div></div>
       <div class="f"><label for="o-sla">Arbiter 1 time before arbiter 2 may act</label><div class="pair"><input id="o-sla" name="sla" required inputmode="numeric" value="5"><select name="slaUnit" aria-label="Arbiter wait unit"><option value="d">days</option><option value="m">minutes</option></select></div></div>
@@ -188,7 +189,9 @@
       <li>The deposit is paid in, up to a cap.</li>
       <li>The tenant declares handover. The landlord then has a fixed window to file one claim.</li>
       <li>No claim: anyone can trigger the refund to the tenant. Claim: only the claimed amount stays locked and the rest goes back to the tenant at once.</li>
-      <li>An arbiter named in the lease splits the locked amount. A second arbiter can step in if the first stays silent. Payouts always sum to exactly the amount held.</li>
+      <li>The tenant can put one reply on the record. An arbiter named in the lease splits the locked amount and records a hash of the reasons. A second arbiter can step in if the first stays silent. Payouts always sum to exactly the amount held.</li>
+      <li>If neither arbiter rules by the deadline (two arbiter waits after the claim), the claim lapses and the tenant is refunded. Silence never locks the money.</li>
+      <li>The deposit can be held in a dollar stablecoin instead of NEAR, so it keeps its value while the lease runs.</li>
     </ol>
     <h2>Why NEAR, honestly</h2>
     <p>Refund-by-default escrow can be written on other chains, and other projects have. What NEAR adds here:</p>
@@ -201,9 +204,9 @@
     <ul>
       <li>This deployment runs on NEAR testnet. The money is test tokens. Before real money: an independent audit of the contract and a legal review, neither done.</li>
       <li>It does not replace a court. It is a private contract between the parties. We have not checked how Nigerian courts would treat it.</li>
-      <li>Disputes still need a human arbiter, and an arbiter can be wrong.</li>
+      <li>Disputes still need a human arbiter, and an arbiter can be wrong. Who the arbiters are, and how they are chosen and paid, is something the landlord and tenant agree outside the chain. The vault only enforces that a ruling splits the locked amount, records the reasons' hash, and cannot be stalled forever.</li>
       <li>Landlords must choose to use it. We have not verified that any would.</li>
-      <li>The vault holds NEAR, which moves in price. There is no naira rail and no stablecoin version yet.</li>
+      <li>A vault in NEAR moves with NEAR's price. A vault in a dollar stablecoin avoids that, and protects against naira inflation only to the extent that dollars hold their value against the naira. On testnet the stablecoin is a test token (tUSD) with no value. There is no naira token or naira on-ramp, and no mainnet stablecoin account has been configured yet.</li>
       <li>Paying in from other chains through NEAR Intents is not built: Intents has no testnet.</li>
       <li>Wallets cannot create keyless vaults yet, so opening one is signed by a small key in your browser. It only pays the fee and has no power over the vault. Paying in, claims and rulings are signed by your wallet.</li>
     </ul>
@@ -212,6 +215,6 @@
 </main>
 
 <footer class="wrap foot">Built for the NEAR Hackathon. MIT licence. <a href="https://github.com/ibnweb3/cautio">Source</a>. Photo: Ikoyi, Lagos, by Reginald Bassey, <a href="https://commons.wikimedia.org/wiki/File:Ikoyi,_Lagos,_Nigeria.jpg">CC BY-SA 4.0</a>.</footer>
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=20261114"></script>
 </body>
 </html>

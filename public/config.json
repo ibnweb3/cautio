@@ -6,14 +6,21 @@
       "rpc": "https://test.rpc.fastnear.com",
       "explorer": "https://testnet.nearblocks.io",
       "registrar": "testnet",
-      "pinnedCodeHash": "7sPm7Ernye7aJp3DnHeUQAzzPGKD1YCZrdfLHF6N43vZ",
+      "pinnedCodeHash": "CfQddEJ2WDcQVSgCZ1cTrVkNxJRXhjpHdy3J7TPGpVvg",
       "legacyCodeHashes": [
-        "2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM"
+        "2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM",
+        "7sPm7Ernye7aJp3DnHeUQAzzPGKD1YCZrdfLHF6N43vZ"
       ],
       "nftCodeHash": "ivu1e9obVRnMJLSvVPRgtYefUYUS1L3f5eYHjS86zL9",
       "vault": "0sbe62faf670eea0865bcc7cdb7536c1b670dc81d4",
       "unit": "unit-4b.derby-tv-bldg.testnet",
-      "token": "lease-4b-1"
+      "token": "lease-4b-1",
+      "stable": {
+        "id": "cautio-usd.testnet",
+        "symbol": "tUSD",
+        "decimals": 6,
+        "test": true
+      }
     },
     "mainnet": {
       "label": "NEAR mainnet",

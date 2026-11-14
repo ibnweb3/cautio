@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { DeterministicStateInit } from "near-api-js";
 import { encodeState as nodeEncode, sha256hex, globalHash } from "../scripts/lib/state.mjs";
-import { encodeState, sha256Hex, b58, sha256, parseNear, fmtNear } from "../public/state.js";
+import { encodeState, sha256Hex, b58, sha256, parseNear, fmtNear, parseUnits, fmtUnits } from "../public/state.js";
 import { readFileSync } from "node:fs";
 
 const terms = {
@@ -15,6 +15,11 @@ const terms = {
 
 test("browser encoder matches the Node encoder byte for byte", () => {
   assert.deepEqual(Buffer.from(encodeState(terms)), nodeEncode(terms));
+});
+test("browser encoder matches the Node encoder for a token vault, and the token changes the address", () => {
+  const withToken = { ...terms, token: "cautio-usd.testnet" };
+  assert.deepEqual(Buffer.from(encodeState(withToken)), nodeEncode(withToken));
+  assert.notDeepEqual(Buffer.from(encodeState(withToken)), Buffer.from(encodeState(terms)));
 });
 test("browser sha256 matches Node sha256", async () => {
   assert.equal(await sha256Hex("some lease text"), terms.termsHashHex);
@@ -38,4 +43,12 @@ test("amount parsing and formatting", () => {
   assert.equal(fmtNear(1n), "<0.000001");
   assert.throws(() => parseNear("abc"));
   assert.throws(() => parseNear("-1"));
+});
+test("token amounts use the token's own decimals", () => {
+  assert.equal(parseUnits("300", 6), 300_000_000n);
+  assert.equal(parseUnits("0.5", 6), 500_000n);
+  assert.equal(fmtUnits(300_000_000n, 6), "300");
+  assert.equal(fmtUnits(1n, 6), "0.000001");
+  assert.throws(() => parseUnits("1.1234567", 6));
+  assert.throws(() => parseUnits("-1", 6));
 });

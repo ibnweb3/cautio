@@ -1,6 +1,6 @@
 # Cautio
 
-A rental caution deposit that nobody can move by hand. It sits in a NEAR account with **no access keys**, running code that is referenced **by hash**. The tenant gets it back by default. The landlord can keep part of it only by filing a claim inside a fixed window, and an arbiter named in the lease settles disputes.
+A rental caution deposit that nobody can move by hand. It sits in a NEAR account with **no access keys**, running code that is referenced **by hash**, and it can be held in NEAR or in a **dollar stablecoin** so it keeps its value while the lease runs. The tenant gets it back by default. The landlord can keep part of it only by filing a claim inside a fixed window, and an arbiter named in the lease settles disputes.
 
 Built for NEAR HACKATHON. (Renamed from "TenancyVault" before submission. The on-chain accounts, vaults and published code predate the rename and keep their addresses; the Rust crate in `contract/` is still called `tenancy-vault`.) Tracks: NFTs That Do Something, Real-World Money. **Testnet only.**
 
@@ -32,20 +32,28 @@ The site is a working testnet app. Nothing on it is simulated: it talks to NEAR 
 | Tab **Account**: create an account | a testnet key made in your browser (kept in local storage) and its address. Send it a little testnet NEAR |
 | Tab **New vault**: fill in the parties, cap, windows and lease terms, press Create | a real keyless vault on testnet, its address, and the terms file to keep |
 | Back in **Vaults**: pay the deposit, declare handover, file a claim, rule | each action is a signed testnet transaction with a link to the explorer. Buttons show only what your account may do in the vault's current phase |
-| `npm test` | 5 tests: the browser state encoder matches the Node one byte for byte, the published code hash, vault address derivation, amount parsing |
-| `cd contract && cargo test` (needs Rust) | 20 contract tests pass |
+| `npm test` | 7 tests: the browser state encoder matches the Node one byte for byte, the published code hash, vault address derivation, amount parsing |
+| `cd contract && cargo test` (needs Rust) | 33 contract tests pass |
 | Read [`evidence/EVIDENCE.md`](evidence/EVIDENCE.md) and [`evidence/browser-run.md`](evidence/browser-run.md) | transaction links and what each run proved |
 
 One account in the browser can hold one role at a time. To try all roles, open the vault with different accounts (import a key in the Account tab), or share the vault link with the other parties.
 
 ## What is live on testnet
 
-- Contract published as an immutable global contract. Current code hash `7sPm7Ernye7aJp3DnHeUQAzzPGKD1YCZrdfLHF6N43vZ` (sha256 of [`build/opt.wasm`](build/opt.wasm), built with `--cfg near` so rejected calls show their real reason). The first build, `2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM`, is still published; vaults made with it keep working and the page marks them as an older build.
+- Contract published as an immutable global contract. Current code hash `CfQddEJ2WDcQVSgCZ1cTrVkNxJRXhjpHdy3J7TPGpVvg` (sha256 of [`build/opt.wasm`](build/opt.wasm), built with `--cfg near` so rejected calls show their real reason). Two earlier builds, `7sPm7Ernye7aJp3DnHeUQAzzPGKD1YCZrdfLHF6N43vZ` and `2HRG5fYiAwTZ74iZV3P2VynPWDq8J2Eu36XYHqSoXAwM`, are still published; vaults made with them keep working (NEAR only, no reply or lapse) and the page marks them as older builds.
 - Three vaults created with `DeterministicStateInit` (keyless accounts whose address is derived from the code hash and the terms). Vault C, `0sbe62faf670eea0865bcc7cdb7536c1b670dc81d4`, ran the full claim and arbiter path. Vaults A and B ran the default-refund path.
 - Vault D, `0sc28f1987ea5e2ccfeace344ed95076ad2d46bdbd`, was created **from the web page** (the in-browser account was the landlord), then funded and given a claim from the page. See `evidence/browser-run.md`.
 - Building root account `derby-tv-bldg.testnet`, unit sub-account `unit-4b.derby-tv-bldg.testnet`, and a lease NFT (`lease-4b-1`) owned by the tenant. Its metadata names the vault and terms hash.
 
 See [`evidence/EVIDENCE.md`](evidence/EVIDENCE.md) for what was checked and what was not.
+
+## New in the current build: stablecoin deposits and dispute fixes
+
+- **Token deposits.** A vault can hold any NEP-141 token instead of NEAR (`token` is part of the vault's terms, so it is part of the address). The deposit is paid with `ft_transfer_call`; anything over the cap is sent back. If a payout fails (for example the payee is not registered with the token), the amount is recorded in the vault and anyone can retry it with `claim_owed` once the payee is registered.
+- **The stablecoin on testnet is a test token.** `cautio-usd.testnet` is `tUSD`, 6 decimals, with an open faucet (source in `token/`). It has no value. On mainnet a vault would name a real stablecoin such as USDC; we have not configured or verified that account, and nothing here has run on mainnet.
+- **Disputes.** The tenant can record one reply to a claim (`respond`, a hash of the text or files). A ruling now records a hash of the arbiter's reasons. If neither arbiter rules within two arbiter waits after the claim, a late ruling is refused and anyone can call `lapse_claim`: the claim lapses and the tenant is refunded, so silence cannot lock the money. Who the arbiters are, how they are chosen and how they are paid is still agreed between landlord and tenant outside the chain.
+- **Tested live on testnet** (`scripts/live-e3.mjs`, results in [`evidence/live-e3.md`](evidence/live-e3.md)): token deposit and the over-cap refund, a partial claim with exact payouts, the tenant reply, a ruling with reasons, a late ruling refused and the lapse refund, and a failed payout recorded and retried. The demo in the page (a stablecoin vault) was also played through in a browser: deposit, handover, claim, reply, ruling.
+- **What a stablecoin does and does not do.** A vault in a dollar token does not move with NEAR's price. It protects against naira inflation only as far as the dollar holds its value against the naira, which is the reason for it, not a guarantee. There is no naira token and no naira on-ramp.
 
 ## How NEAR is used
 
@@ -59,7 +67,7 @@ See [`evidence/EVIDENCE.md`](evidence/EVIDENCE.md) for what was checked and what
 Refund-by-default escrow can be written on other chains, and the projects above did. We do not claim NEAR is the only place this could run. What NEAR adds:
 
 - **Keyless is a checkable property.** The vault is a deterministic account created from a code hash plus its terms. One RPC call shows it has zero keys and which code it runs.
-- **One published copy of the code.** Each vault references the global contract by hash, so a new vault is cheap after the one-time publish (12.84 testnet NEAR for our 128 KB wasm).
+- **One published copy of the code.** Each vault references the global contract by hash, so a new vault is cheap after the one-time publish (about 14.2 testnet NEAR for the 142 KB wasm of the current build).
 - **Named nested accounts** fit buildings and units: `unit-4b.<building>`.
 - **Intents pay-in** (not built) is where NEAR's cross-chain feature would matter most.
 
@@ -86,7 +94,7 @@ We did not build NEAR Intents pay-in (see below), so that part of the idea is no
 - **Not a court.** This is a private contract between the parties. We have not checked how Nigerian courts would treat it, nor any tax or licensing duties that apply to holding or converting crypto in Nigeria. Get local legal advice before real use.
 - **Evidence hashes are not proof of truth.** A condition-report hash shows the document existed unchanged, not that it is accurate.
 - **Older vaults show generic errors.** Vaults made with the first build (`2HRG5f…`) report rejected calls as "unreachable". Vaults made with the current build report the reason.
-- **Fixed address, no storage top-up.** A vault's balance must stay above NEAR's storage minimum. We send a small plain-NEAR buffer to each vault before use.
+- **Fixed address, no storage top-up.** A vault's balance must stay above NEAR's storage minimum. A new vault starts with no NEAR of its own: native vaults are fine because the deposit is the balance, and the page sends a token vault 0.02 NEAR so it can attach the 1 yoctoNEAR that token transfers need. Found in the first live token run (`LackBalanceForState`) and fixed.
 - **Refund address must exist.** If the tenant's refund account does not exist, a payout transfer would fail and the money would stay in the vault. The refund address is fixed at creation.
 - **The lease NFT is a standard contract.** It points to the vault, but nothing on chain makes the vault check the NFT. Rental history "travelling with the tenant" is not built.
 - **Recovery address and arbiter 2** were run on chain with the current build: see `evidence/live-e2.md`. The page's buttons for them were not clicked through live.
@@ -101,18 +109,18 @@ We did not build NEAR Intents pay-in (see below), so that part of the idea is no
 
 ## Not built
 
-NEAR Intents pay-in from other chains (Intents has no testnet and we did not spend mainnet funds), stablecoin or naira vaults (the vault holds NEAR, which moves in price), a hosted evidence store (you keep the files; only their hash is on chain), email or SMS alerts (only calendar files), an independent audit, a legal review, passkey accounts, a bonded arbiter panel, unpaid-rent claims (dropped on purpose: a capped deposit cannot cover arrears, and a landlord-triggered rent claim could reward an illegal lockout), lease renewal.
+NEAR Intents pay-in from other chains (Intents has no testnet and we did not spend mainnet funds), a naira token or naira on-ramp, a configured and verified mainnet stablecoin account, a hosted evidence store (you keep the files; only their hash is on chain), email or SMS alerts (only calendar files), an independent audit, a legal review, passkey accounts, a bonded arbiter panel, unpaid-rent claims (dropped on purpose: a capped deposit cannot cover arrears, and a landlord-triggered rent claim could reward an illegal lockout), lease renewal.
 
 ## Files
 
-- `contract/`: the Rust contract and its 20 unit tests.
+- `contract/`: the Rust contract and its 33 unit tests. `token/` is the test dollar (`tUSD`) used on testnet only.
 - `public/`: the web app (static). `app.js` is the app, `state.js` builds the vault's initial state and hashes in the browser, `near.bundle.js` is `near-api-js` bundled for the browser (`npm run build:web`; source in `web/`).
 - `scripts/`: publish, create vault, run the flows, build the evidence report. They need a funded testnet key in `secrets/` (gitignored).
 - `build/opt.wasm`: the published code. `evidence/`: recorded chain responses.
 
 ## Rebuild the contract
 
-Rust nightly with `rust-src`, target `wasm32-unknown-unknown`, then `scripts/build.sh` in Linux or WSL (it uses `--cfg near`, `-Z build-std` and `target-cpu=mvp` so the wasm uses only features NEAR accepts, then runs `wasm-opt --mvp-features -Oz`). The published `7sPm7E…` build used rustc 1.102.0-nightly (2026-11-11) and binaryen 132. A different toolchain will likely give a different hash, so before trusting a published hash, rebuild with the versions above and compare. The first build (`2HRG5f…`) used Rust 1.100 nightly and binaryen 125 and reproduced exactly then.
+Rust nightly with `rust-src`, target `wasm32-unknown-unknown`, then `scripts/build.sh` in Linux or WSL (it uses `--cfg near`, `-Z build-std` and `target-cpu=mvp` so the wasm uses only features NEAR accepts, then runs `wasm-opt --mvp-features -Oz`). The published `CfQddE…` build used rustc 1.102.0-nightly (2026-11-11) and binaryen 132 (the `7sPm7E…` build used the same toolchain). The test token builds with `scripts/build-token.sh`. A different toolchain will likely give a different hash, so before trusting a published hash, rebuild with the versions above and compare. The first build (`2HRG5f…`) used Rust 1.100 nightly and binaryen 125 and reproduced exactly then.
 
 ## AI disclosure
 

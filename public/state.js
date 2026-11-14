@@ -21,15 +21,18 @@ export const fromHex = (h) => Uint8Array.from(h.match(/../g) || [], (x) => parse
 export const toHex = (b) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 export const utf8 = (s) => enc.encode(s);
 
-/** t: {landlord,tenant,recovery,arbiter1,arbiter2,capYocto,claimWindowNs,arbiterSlaNs,recoveryTimelockNs,arbiterFeeBps,termsHashHex} */
+/** t: {landlord,tenant,recovery,arbiter1,arbiter2,capYocto,claimWindowNs,arbiterSlaNs,recoveryTimelockNs,arbiterFeeBps,termsHashHex,token?} */
 export function encodeState(t) {
   if (!/^[0-9a-f]{64}$/.test(t.termsHashHex)) throw new Error("termsHashHex must be 64 hex chars");
   return cat(
     str(t.landlord), str(t.tenant), str(t.recovery), str(t.arbiter1), str(t.arbiter2),
     u(t.capYocto, 16), u(t.claimWindowNs, 8), u(t.arbiterSlaNs, 8), u(t.recoveryTimelockNs, 8),
     u(t.arbiterFeeBps, 2), fromHex(t.termsHashHex),
+    // token: Borsh Option<AccountId>. None = native NEAR, Some = the NEP-141 token the deposit is paid in
+    t.token ? cat(u(1, 1), str(t.token)) : u(0, 1),
     // progress fields, all zero at creation
     u(0, 1), u(0, 16), u(0, 8), u(0, 16), u(0, 1), new Uint8Array(32), u(0, 8), u(0, 8), u(0, 1),
+    new Uint8Array(32), u(0, 8), new Uint8Array(32), u(0, 4), // response_hash, response_at, ruling_hash, owed (empty Vec)
   );
 }
 
@@ -49,17 +52,18 @@ export async function sha256(bytes) {
 export const sha256Hex = async (x) => toHex(await sha256(x));
 
 // ---- amounts ----
-const NEAR = 10n ** 24n;
-/** "0.25" -> yoctoNEAR (bigint). Throws on anything that is not a plain decimal with up to 24 places. */
-export function parseNear(s) {
-  const m = /^(\d+)(?:\.(\d{1,24}))?$/.exec(String(s).trim());
-  if (!m) throw new Error("Enter an amount like 0.5");
-  return BigInt(m[1]) * NEAR + BigInt((m[2] || "").padEnd(24, "0"));
+/** "0.25" -> smallest units (bigint) for a token with `decimals` places. Throws on anything that is not a plain decimal. */
+export function parseUnits(s, decimals) {
+  const m = new RegExp("^(\\d+)(?:\\.(\\d{1," + Math.max(decimals, 1) + "}))?$").exec(String(s).trim());
+  if (!m || (decimals === 0 && m[2])) throw new Error("Enter an amount like 0.5");
+  return BigInt(m[1]) * 10n ** BigInt(decimals) + BigInt((m[2] || "").padEnd(decimals, "0") || "0");
 }
-/** yoctoNEAR -> "0.25" (trims zeros, up to 6 decimals, never rounds a non-zero amount down to 0.000000 silently). */
-export function fmtNear(y) {
-  const v = BigInt(y);
-  const whole = v / NEAR, frac = (v % NEAR).toString().padStart(24, "0").slice(0, 6).replace(/0+$/, "");
-  if (v > 0n && whole === 0n && frac === "") return "<0.000001";
+/** smallest units -> "0.25" (trims zeros, up to 6 decimals, never rounds a non-zero amount down to 0.000000 silently). */
+export function fmtUnits(y, decimals) {
+  const v = BigInt(y), base = 10n ** BigInt(decimals);
+  const whole = v / base, frac = decimals ? (v % base).toString().padStart(decimals, "0").slice(0, 6).replace(/0+$/, "") : "";
+  if (v > 0n && whole === 0n && frac === "") return "<0." + "0".repeat(Math.min(decimals, 6) - 1) + "1";
   return frac ? `${whole}.${frac}` : String(whole);
 }
+export const parseNear = (s) => parseUnits(s, 24);
+export const fmtNear = (y) => fmtUnits(y, 24);
