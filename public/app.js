@@ -742,3 +742,12 @@ fetch("config.json", { cache: "no-cache" }).then((r) => r.json()).then((c) => {
   if (m) openVault(m[1]);
   else if (cfg.vault) { $("#vault-id").value = cfg.vault; }
 }).catch((x) => { $("#vault-empty").textContent = "Could not load config.json: " + x.message; });
+
+// keep the vault view current: deadlines pass and other parties act while the page is open (skipped while the user is typing)
+setInterval(() => {
+  if (document.hidden || !current || current.state.phase >= 3) return;
+  const a = document.activeElement;
+  if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.closest("#actions")) return;
+  if ($("#actions textarea") && [...$("#actions").querySelectorAll("textarea,input")].some((x) => x.value && x.value !== x.defaultValue)) return;
+  loadVault(current.id, true).catch(() => {});
+}, 10000);
