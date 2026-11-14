@@ -1,5 +1,15 @@
 # Cautio
 
+> **A story first (an invented tenant, to show the problem).**
+>
+> Tolu scrapes together ₦1,000,000 for a caution deposit in Lagos, hands it over in good faith, and moves in. Twelve months later she is moving out, and suddenly there is a "scratch on the wall." Weeks turn into excuses, calls go unanswered, and the deposit is gone. Even a tenant who gets it back a year later has lost ground: the naira has kept sliding, so the same money buys less.
+>
+> The same tenant, with Cautio: the deposit goes into a vault that no one holds a key to, in a dollar token. The landlord can keep part of it only by filing one claim inside a fixed window. The rest comes back to Tolu at once, and if nobody files, she is refunded by default. Where they disagree, an arbiter named in the lease splits the locked amount, and the vault pays out exactly that.
+>
+> Tolu is invented. The problem is real and common, but we have no statistics for it and make no claim about how often deposits are lost.
+
+**Built on NEAR, and it only works because of three NEAR features:** (1) a **deterministic state-init account** (NEP-616) that is born with no access keys, so nobody can take the money out by hand and one RPC call proves it; (2) a **global contract referenced by hash**, so anyone can verify that every vault runs exactly the published code and no publisher can swap it; (3) **NEP-141 tokens** for the dollar deposit and **NEP-171** for the lease NFT on its own unit sub-account. Details in [How NEAR is used](#how-near-is-used).
+
 A rental caution deposit that nobody can move by hand. It sits in a NEAR account with **no access keys**, running code that is referenced **by hash**, and it can be held in NEAR or in a **dollar stablecoin** so it keeps its value while the lease runs. The tenant gets it back by default. The landlord can keep part of it only by filing a claim inside a fixed window, and an arbiter named in the lease settles disputes.
 
 Built for NEAR HACKATHON. (Renamed from "TenancyVault" before submission. The on-chain accounts, vaults and published code predate the rename and keep their addresses; the Rust crate in `contract/` is still called `tenancy-vault`.) Tracks: NFTs That Do Something, Real-World Money. **Testnet only.**
@@ -28,6 +38,7 @@ The site is a working testnet app. Nothing on it is simulated: it talks to NEAR 
 
 | Do | See |
 |---|---|
+| Site, tab **Vaults**: press **Start a demo vault** (no wallet) | a real stablecoin vault on testnet in about 15 s. Switch between landlord, tenant, arbiters and recovery with the chips and play pay, handover, claim, reply and ruling. The Checks card shows no access keys and the pinned code hash |
 | Site, tab **Vaults**: open the example vault | live status read from chain, and checks: no access keys, code referenced by hash, code re-hashed in your browser |
 | Tab **Account**: create an account | a testnet key made in your browser (kept in local storage) and its address. Send it a little testnet NEAR |
 | Tab **New vault**: fill in the parties, cap, windows and lease terms, press Create | a real keyless vault on testnet, its address, and the terms file to keep |
@@ -87,8 +98,8 @@ We did not build NEAR Intents pay-in (see below), so that part of the idea is no
 
 ## Honest limits
 
-- **Testnet only.** The deposit is testnet NEAR. No mainnet funds were used.
-- **No naira rail.** NEAR's docs have no fiat on-ramp or naira support that we found. This is meant for dollar-quoted rentals (for example diaspora-owned or corporate flats). How common those are, we have not verified.
+- **Testnet only.** Deposits are testnet NEAR or the `tUSD` test token. No mainnet funds were used.
+- **No naira rail.** NEAR's docs have no fiat on-ramp or naira support that we found. The stablecoin deposit keeps its value against the naira only as far as the dollar does. Dollar-quoted rentals (for example diaspora-owned or corporate flats) are the clearest fit; how common those are, we have not verified.
 - **Disputes still need a human arbiter.** An arbiter can be wrong or bribed. The contract only limits what an arbiter can do: split the locked amount, with a capped fee.
 - **Landlords must opt in.** We have not verified that any would.
 - **Not a court.** This is a private contract between the parties. We have not checked how Nigerian courts would treat it, nor any tax or licensing duties that apply to holding or converting crypto in Nigeria. Get local legal advice before real use.
@@ -97,11 +108,11 @@ We did not build NEAR Intents pay-in (see below), so that part of the idea is no
 - **Fixed address, no storage top-up.** A vault's balance must stay above NEAR's storage minimum. A new vault starts with no NEAR of its own: native vaults are fine because the deposit is the balance, and the page sends a token vault 0.02 NEAR so it can attach the 1 yoctoNEAR that token transfers need. Found in the first live token run (`LackBalanceForState`) and fixed.
 - **Refund address must exist.** If the tenant's refund account does not exist, a payout transfer would fail and the money would stay in the vault. The refund address is fixed at creation.
 - **The lease NFT is a standard contract.** It points to the vault, but nothing on chain makes the vault check the NFT. Rental history "travelling with the tenant" is not built.
-- **Recovery address and arbiter 2** were run on chain with the current build: see `evidence/live-e2.md`. The page's buttons for them were not clicked through live.
+- **Recovery address and arbiter 2** were run on chain with the current build: see `evidence/live-e2.md`. The page's buttons for arbiter 2, recovery start and cancel, and closing a lapsed claim were also clicked through on the live site on 2026-11-14 with the demo accounts.
 
 ## Also in the page
 
-- Wallet connection through `@hot-labs/near-connect` (Meteor, Intear, Nightly, Ledger and others). Pay-in, handover, claims, rulings and recovery are signed by the wallet. **Not tested with a real wallet.** Wallets cannot create the keyless vault yet (no state-init action), so opening a vault is signed by a small key kept in the browser; it only pays the fee.
+- Wallet connection through `@hot-labs/near-connect` (Meteor, Intear, Nightly, Ledger and others). Pay-in, handover, claims, rulings and recovery are signed by the wallet. **Tested with a real wallet (Meteor in Brave, 2026-11-14): connect, disconnect, and a signed 0.3 NEAR transfer to the browser account. Vault actions signed by the wallet (pay-in, handover, claims, rulings) were not tested with a real wallet; the same actions were tested with the browser account and the demo accounts.** Wallets cannot create the keyless vault yet (no state-init action), so opening a vault is signed by a small key kept in the browser; it only pays the fee.
 - Network settings in `public/config.json` (testnet and mainnet blocks). Mainnet has no published contract hash yet, so the page refuses to open vaults there.
 - Lease NFT issued from the page by a landlord with a named account (creates a keyless unit sub-account on the standard NFT code by hash, mints to the tenant). Run live: see `evidence/browser-run.md`.
 - **Demo mode** (testnet only): a visitor with no wallet starts a real vault with 2-minute timers and switches between landlord, tenant, both arbiters and recovery to play every step. It uses shared throwaway accounts whose keys are public on purpose (`public/demo.json`, made by `scripts/make-demo-accounts.mjs`), so they can never hold anything of value. Run through end to end from the page on 2026-11-13 (pay in, handover, claim, arbiter ruling).
