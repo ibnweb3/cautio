@@ -158,3 +158,4 @@ button.cta.ghost{background:rgba(255,255,255,.22);border:1px solid rgba(255,255,
 .navwallet{border:0;border-radius:999px;background:#111;color:#fff;font-weight:500;padding:9px 16px;white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis}
 .navwallet.on{background:#f1f1f1;color:#111}
 @media (max-width:760px){.navwallet{padding:8px 10px;font-size:.84rem;max-width:120px}}
+.navwrap{position:relative;display:inline-block}.navmenu{position:absolute;right:0;top:calc(100% + 8px);background:#fff;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.18);padding:6px;display:flex;flex-direction:column;min-width:150px;z-index:30}.navmenu[hidden]{display:none}.navmenu button{border:0;background:none;text-align:left;padding:10px 14px;border-radius:10px;color:#111}@media (hover:hover){.navmenu button:hover{background:#f1f1f1}}
