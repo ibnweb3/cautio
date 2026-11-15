@@ -38,7 +38,7 @@ The site is a working testnet app. Nothing on it is simulated: it talks to NEAR 
 
 | Do | See |
 |---|---|
-| Site, tab **Vaults**: press **Start a demo vault** (no wallet) | a real stablecoin vault on testnet in about 15 s. Switch between landlord, tenant, arbiters and recovery with the chips and play pay, handover, claim, reply and ruling. The Checks card shows no access keys and the pinned code hash |
+| Site, tab **Vaults**: press **Start a demo vault** (no wallet) | a real stablecoin vault on testnet, in about 15 to 60 seconds depending on testnet speed (the page says "about 15 seconds"; in a 2026-11-15 run it took about 50). Wait for "Demo vault ready". Switch between landlord, tenant, arbiters and recovery with the chips and play pay, handover, claim, reply and ruling. The Checks card shows no access keys and the pinned code hash |
 | Site, tab **Vaults**: open the example vault | live status read from chain, and checks: no access keys, code referenced by hash, code re-hashed in your browser |
 | Tab **Account**: create an account | a testnet key made in your browser (kept in local storage) and its address. Send it a little testnet NEAR |
 | Tab **New vault**: fill in the parties, cap, windows and lease terms, press Create | a real keyless vault on testnet, its address, and the terms file to keep |
